@@ -1,5 +1,6 @@
 package com.example.hc2garmin.data.remote
 
+import com.example.hc2garmin.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -76,7 +77,11 @@ class GarminApiService(private val authService: GarminAuthService) {
                 when (response.code) {
                     200, 201 -> Unit
                     409 -> Unit  // duplicate — treat as success
-                    else -> throw Exception("Upload failed: HTTP ${response.code} — $responseBody")
+                    else -> {
+                        val errorMsg = if (BuildConfig.DEBUG) "Upload failed: HTTP ${response.code} — $responseBody"
+                                       else "Upload failed: HTTP ${response.code}"
+                        throw Exception(errorMsg)
+                    }
                 }
             }
         }

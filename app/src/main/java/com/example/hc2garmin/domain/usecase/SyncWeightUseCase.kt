@@ -48,7 +48,9 @@ class SyncWeightUseCase(
         val endDate = LocalDate.now(ZoneId.systemDefault())
         val existingDates = runCatching {
             apiService.fetchExistingWeightDates(startDate, endDate)
-        }.getOrElse { emptySet() }
+        }.getOrElse { 
+            return SyncResult.NetworkError("Failed to fetch existing weights from Garmin: ${it.message}")
+        }
 
         var uploadedCount = 0
         for (record in records) {

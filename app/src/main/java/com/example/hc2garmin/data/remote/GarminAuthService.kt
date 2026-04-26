@@ -2,6 +2,7 @@ package com.example.hc2garmin.data.remote
 
 import android.util.Base64
 import android.util.Log
+import com.example.hc2garmin.BuildConfig
 import com.example.hc2garmin.data.local.PreferencesManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -107,7 +108,9 @@ class GarminAuthService(private val prefs: PreferencesManager) {
         val response = client.newCall(request).execute()
         val body = response.body?.string() ?: return null
 
-        Log.d(TAG, "MFA response url=$url code=${response.code} body=$body")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "MFA response url=$url code=${response.code} body=$body")
+        }
 
         if (response.code == 429) {
             val retryMs = 30 * 60 * 1000L
@@ -121,7 +124,7 @@ class GarminAuthService(private val prefs: PreferencesManager) {
         Log.d(TAG, "MFA status=$status")
         if (status != "SUCCESSFUL") return null
 
-        return json.optString("serviceTicketId", null)
+        return json.optString("serviceTicketId").takeIf { it.isNotEmpty() }
     }
 
     suspend fun finishLoginWithTicket(ticket: String): Result<Unit> = withContext(Dispatchers.IO) {
@@ -193,25 +196,37 @@ class GarminAuthService(private val prefs: PreferencesManager) {
         val response = client.newCall(request).execute()
         val body = response.body?.string() ?: throw Exception("Empty SSO response")
 
-        Log.d(TAG, "SSO response code=${response.code} body=$body")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "SSO response code=${response.code} body=$body")
+        }
 
         if (response.code == 429) {
             val retryMs = 30 * 60 * 1000L
             prefs.setRateLimitUntil(System.currentTimeMillis() + retryMs)
             throw RateLimitedException(retryMs)
         }
-        if (!response.isSuccessful) throw Exception("SSO login failed: HTTP ${response.code} body=$body")
+        if (!response.isSuccessful) {
+            val errorMsg = if (BuildConfig.DEBUG) "SSO login failed: HTTP ${response.code} body=$body"
+                           else "SSO login failed: HTTP ${response.code}"
+            throw Exception(errorMsg)
+        }
 
         val json = JSONObject(body)
         val status = json.optJSONObject("responseStatus")?.optString("type") ?: ""
-        Log.d(TAG, "SSO status=$status")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "SSO status=$status")
+        }
 
         if (status == "MFA_REQUIRED") {
             val mfaMethod = json.optJSONObject("customerMfaInfo")
                 ?.optString("mfaLastMethodUsed", "email") ?: "email"
             throw MfaRequiredException(mfaMethod)
         }
-        if (status != "SUCCESSFUL") throw Exception("SSO login rejected: $status body=$body")
+        if (status != "SUCCESSFUL") {
+            val errorMsg = if (BuildConfig.DEBUG) "SSO login rejected: $status body=$body"
+                           else "SSO login rejected: $status"
+            throw Exception(errorMsg)
+        }
 
         return json.getString("serviceTicketId")
     }

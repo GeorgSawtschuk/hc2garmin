@@ -44,7 +44,7 @@ class SyncWorker(appContext: Context, params: WorkerParameters) :
             val request = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.HOURS)
                 .setConstraints(
                     Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .setRequiredNetworkType(NetworkType.UNMETERED)
                         .build()
                 )
                 .build()

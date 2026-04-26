@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Scale / weight symbol -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28 C43,28 34,37 34,48 L34,52 L74,52 L74,48 C74,37 65,28 54,28Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,54 L30,72 C30,75.3 32.7,78 36,78 L72,78 C75.3,78 78,75.3 78,72 L78,54 Z" />
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M44,64 L52,64 L52,56 L56,56 L56,64 L64,64 L64,68 L56,68 L56,76 L52,76 L52,68 L44,68 Z" />
+</vector>

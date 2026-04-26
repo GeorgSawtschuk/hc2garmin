@@ -1,0 +1,3 @@
+-keep class com.example.hc2garmin.** { *; }
+-keepattributes *Annotation*
+-keepattributes SourceFile,LineNumberTable

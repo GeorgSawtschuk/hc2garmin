@@ -29,9 +29,12 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
+      - name: Rename APK
+        run: mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/hc2garmin-${{ github.ref_name }}.apk
+
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: app/build/outputs/apk/debug/hc2garmin-${{ github.ref_name }}.apk
           generate_release_notes: true
           tag_name: ${{ github.ref_name }}

@@ -4,3 +4,6 @@
 
 # Java heap dumps
 *.hprof
+
+# Local SDK path — machine-specific
+local.properties

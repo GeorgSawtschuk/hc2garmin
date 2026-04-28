@@ -3,6 +3,8 @@ package com.example.hc2garmin.ui.main
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import android.content.Context
+import android.os.PowerManager
 import com.example.hc2garmin.data.healthconnect.HealthConnectManager
 import com.example.hc2garmin.data.local.PreferencesManager
 import com.example.hc2garmin.data.remote.GarminApiService
@@ -23,6 +25,7 @@ data class MainUiState(
     val hasCredentials: Boolean = false,
     val hasHcPermission: Boolean = false,
     val isGarminAuthenticated: Boolean = false,
+    val isIgnoringBatteryOptimizations: Boolean = true,
     val lastSyncText: String = "Never",
     val lastSyncCount: Int = 0,
     val isSyncing: Boolean = false,
@@ -49,20 +52,39 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(MainUiState())
     val state: StateFlow<MainUiState> = _state.asStateFlow()
 
+    val requiredPermissions: Set<String> get() = hcManager.requiredPermissions
+
     fun loadState() {
         viewModelScope.launch {
             val ts = prefs.getLastSyncTimestamp()
             val tsText = if (ts == 0L) "Never"
             else DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(ts))
 
+            val hasHcPerm = hcManager.hasPermissions()
+            val hasCredentials = prefs.getEmail() != null
+            val isGarminAuth = prefs.getTokens()?.isAccessTokenExpired() == false
+
+            checkBatteryOptimization()
+
             _state.value = _state.value.copy(
-                hasCredentials = prefs.getEmail() != null,
-                hasHcPermission = hcManager.hasPermissions(),
-                isGarminAuthenticated = prefs.getTokens()?.isAccessTokenExpired() == false,
+                hasCredentials = hasCredentials,
+                hasHcPermission = hasHcPerm,
+                isGarminAuthenticated = isGarminAuth,
                 lastSyncText = tsText,
                 lastSyncCount = prefs.getLastSyncCount()
             )
+
+            // Auto-schedule if everything is ready
+            if (hasHcPerm && hasCredentials) {
+                SyncWorker.schedule(getApplication())
+            }
         }
+    }
+
+    fun checkBatteryOptimization() {
+        val pm = getApplication<Application>().getSystemService(Context.POWER_SERVICE) as PowerManager
+        val isIgnoring = pm.isIgnoringBatteryOptimizations(getApplication<Application>().packageName)
+        _state.value = _state.value.copy(isIgnoringBatteryOptimizations = isIgnoring)
     }
 
     fun showConnectDialog() {

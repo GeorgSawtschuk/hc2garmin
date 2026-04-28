@@ -1,5 +1,9 @@
 package com.example.hc2garmin.ui.main
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -10,11 +14,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -25,12 +33,27 @@ fun MainScreen(
 ) {
     val state by vm.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     val permissionLauncher = rememberLauncherForActivityResult(
         PermissionController.createRequestPermissionResultContract()
     ) { _ -> vm.loadState() }
 
     LaunchedEffect(Unit) { vm.loadState() }
+
+    // Re-check status when returning to app
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                vm.loadState()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(state.syncError) {
         state.syncError?.let {
@@ -170,6 +193,9 @@ fun MainScreen(
                     Text("Status", style = MaterialTheme.typography.titleMedium)
                     StatusRow("Health Connect", state.hasHcPermission)
                     StatusRow("Garmin Connect", state.isGarminAuthenticated)
+                    StatusRow("Battery Optimization", state.isIgnoringBatteryOptimizations, 
+                        okLabel = "Optimized for background", 
+                        failLabel = "Restricted (may fail)")
                 }
             }
 
@@ -195,13 +221,26 @@ fun MainScreen(
             if (!state.hasHcPermission) {
                 OutlinedButton(
                     onClick = {
-                        permissionLauncher.launch(
-                            setOf("android.permission.health.READ_WEIGHT")
-                        )
+                        permissionLauncher.launch(vm.requiredPermissions)
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Grant Health Connect Permission")
+                    Text("Grant Health Connect Permissions")
+                }
+            }
+
+            // Battery optimization request if needed
+            if (!state.isIgnoringBatteryOptimizations) {
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                        }
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Allow Background Execution (Battery)")
                 }
             }
 
@@ -237,7 +276,7 @@ fun MainScreen(
             Spacer(Modifier.weight(1f))
 
             Text(
-                "Background sync runs automatically every hour when connected to Wi-Fi.",
+                "Background sync runs automatically every hour.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -246,7 +285,12 @@ fun MainScreen(
 }
 
 @Composable
-private fun StatusRow(label: String, ok: Boolean) {
+private fun StatusRow(
+    label: String, 
+    ok: Boolean, 
+    okLabel: String? = null, 
+    failLabel: String? = null
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -256,8 +300,9 @@ private fun StatusRow(label: String, ok: Boolean) {
             color = if (ok) Color(0xFF4CAF50) else MaterialTheme.colorScheme.errorContainer,
             modifier = Modifier.size(10.dp)
         ) {}
+        val statusText = if (ok) (okLabel ?: "Connected") else (failLabel ?: "Not connected")
         Text(
-            "$label: ${if (ok) "Connected" else "Not connected"}",
+            "$label: $statusText",
             style = MaterialTheme.typography.bodyMedium
         )
     }

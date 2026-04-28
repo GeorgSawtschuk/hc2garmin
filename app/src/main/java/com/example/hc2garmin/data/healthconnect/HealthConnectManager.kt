@@ -19,7 +19,8 @@ class HealthConnectManager(private val context: Context) {
     }
 
     val requiredPermissions: Set<String> = setOf(
-        HealthPermission.getReadPermission(WeightRecord::class)
+        HealthPermission.getReadPermission(WeightRecord::class),
+        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
     )
 
     fun isAvailable(): Boolean =

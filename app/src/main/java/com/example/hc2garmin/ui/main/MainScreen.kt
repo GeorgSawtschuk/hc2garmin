@@ -5,6 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.Manifest
+import android.os.Build
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -15,11 +18,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
+import com.example.hc2garmin.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -38,6 +43,10 @@ fun MainScreen(
 
     val permissionLauncher = rememberLauncherForActivityResult(
         PermissionController.createRequestPermissionResultContract()
+    ) { _ -> vm.loadState() }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
     ) { _ -> vm.loadState() }
 
     LaunchedEffect(Unit) { vm.loadState() }
@@ -190,12 +199,13 @@ fun MainScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Status", style = MaterialTheme.typography.titleMedium)
-                    StatusRow("Health Connect", state.hasHcPermission)
-                    StatusRow("Garmin Connect", state.isGarminAuthenticated)
-                    StatusRow("Battery Optimization", state.isIgnoringBatteryOptimizations, 
-                        okLabel = "Optimized for background", 
-                        failLabel = "Restricted (may fail)")
+                    Text(stringResource(R.string.title_status), style = MaterialTheme.typography.titleMedium)
+                    StatusRow(stringResource(R.string.status_hc), state.hasHcPermission)
+                    StatusRow(stringResource(R.string.status_garmin), state.isGarminAuthenticated)
+                    StatusRow(stringResource(R.string.status_notifications), state.hasNotificationPermission)
+                    StatusRow(stringResource(R.string.status_battery), state.isIgnoringBatteryOptimizations, 
+                        okLabel = stringResource(R.string.status_battery_ok), 
+                        failLabel = stringResource(R.string.status_battery_fail))
                 }
             }
 
@@ -205,11 +215,11 @@ fun MainScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Last Sync", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.title_last_sync), style = MaterialTheme.typography.titleMedium)
                     Text(state.lastSyncText, style = MaterialTheme.typography.bodyLarge)
                     if (state.lastSyncCount > 0) {
                         Text(
-                            "${state.lastSyncCount} measurement(s) uploaded",
+                            stringResource(R.string.sync_uploaded_count, state.lastSyncCount),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -225,7 +235,18 @@ fun MainScreen(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Grant Health Connect Permissions")
+                    Text(stringResource(R.string.btn_grant_hc))
+                }
+            }
+
+            if (!state.hasNotificationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                OutlinedButton(
+                    onClick = {
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.btn_enable_notifications))
                 }
             }
 
@@ -240,7 +261,7 @@ fun MainScreen(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Allow Background Execution (Battery)")
+                    Text(stringResource(R.string.btn_allow_background))
                 }
             }
 
@@ -250,7 +271,7 @@ fun MainScreen(
                     onClick = vm::showConnectDialog,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Connect to Garmin")
+                    Text(stringResource(R.string.btn_connect_garmin))
                 }
             }
 
@@ -267,16 +288,16 @@ fun MainScreen(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Syncing...")
+                    Text(stringResource(R.string.syncing_text))
                 } else {
-                    Text("Sync Now")
+                    Text(stringResource(R.string.btn_sync_now))
                 }
             }
 
             Spacer(Modifier.weight(1f))
 
             Text(
-                "Background sync runs automatically every hour.",
+                stringResource(R.string.footer_text),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -300,7 +321,8 @@ private fun StatusRow(
             color = if (ok) Color(0xFF4CAF50) else MaterialTheme.colorScheme.errorContainer,
             modifier = Modifier.size(10.dp)
         ) {}
-        val statusText = if (ok) (okLabel ?: "Connected") else (failLabel ?: "Not connected")
+        val statusText = if (ok) (okLabel ?: stringResource(R.string.status_connected)) 
+                         else (failLabel ?: stringResource(R.string.status_not_connected))
         Text(
             "$label: $statusText",
             style = MaterialTheme.typography.bodyMedium

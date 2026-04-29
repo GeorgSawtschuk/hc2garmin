@@ -5,6 +5,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import android.content.Context
 import android.os.PowerManager
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 import com.example.hc2garmin.data.healthconnect.HealthConnectManager
 import com.example.hc2garmin.data.local.PreferencesManager
 import com.example.hc2garmin.data.remote.GarminApiService
@@ -14,6 +18,8 @@ import com.example.hc2garmin.data.remote.RateLimitedException
 import com.example.hc2garmin.domain.model.SyncResult
 import com.example.hc2garmin.domain.usecase.SyncWeightUseCase
 import com.example.hc2garmin.work.SyncWorker
+import com.example.hc2garmin.work.NotificationHelper
+import com.example.hc2garmin.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +30,7 @@ import java.util.Date
 data class MainUiState(
     val hasCredentials: Boolean = false,
     val hasHcPermission: Boolean = false,
+    val hasNotificationPermission: Boolean = true,
     val isGarminAuthenticated: Boolean = false,
     val isIgnoringBatteryOptimizations: Boolean = true,
     val lastSyncText: String = "Never",
@@ -57,18 +64,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun loadState() {
         viewModelScope.launch {
             val ts = prefs.getLastSyncTimestamp()
-            val tsText = if (ts == 0L) "Never"
+            val tsText = if (ts == 0L) getApplication<Application>().getString(R.string.sync_never)
             else DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(ts))
 
             val hasHcPerm = hcManager.hasPermissions()
             val hasCredentials = prefs.getEmail() != null
             val isGarminAuth = prefs.getTokens()?.isAccessTokenExpired() == false
+            
+            val hasNotifPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    getApplication(), 
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            } else true
 
             checkBatteryOptimization()
 
             _state.value = _state.value.copy(
                 hasCredentials = hasCredentials,
                 hasHcPermission = hasHcPerm,
+                hasNotificationPermission = hasNotifPerm,
                 isGarminAuthenticated = isGarminAuth,
                 lastSyncText = tsText,
                 lastSyncCount = prefs.getLastSyncCount()
@@ -206,7 +221,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val result = runCatching { useCase.execute() }.getOrElse { SyncResult.NetworkError(it.message) }
 
             val error: String? = when (result) {
-                is SyncResult.Success -> null
+                is SyncResult.Success -> {
+                    result.lastMeasurement?.let {
+                        NotificationHelper.showSyncNotification(getApplication(), it)
+                    }
+                    null
+                }
                 is SyncResult.AuthError -> "Garmin auth error: ${result.message}"
                 is SyncResult.NetworkError -> "Network error: ${result.message}"
                 is SyncResult.PermissionError -> "Health Connect permission required"
@@ -214,7 +234,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             val ts = prefs.getLastSyncTimestamp()
-            val tsText = if (ts == 0L) "Never"
+            val tsText = if (ts == 0L) getApplication<Application>().getString(R.string.sync_never)
             else DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(ts))
 
             _state.value = _state.value.copy(

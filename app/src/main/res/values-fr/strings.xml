@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HC2Garmin</string>
+    <string name="notification_channel_name">Synchronisation</string>
+    <string name="notification_channel_description">Notifications après une synchronisation réussie</string>
+    <string name="notification_title">Poids synchronisé</string>
+    <string name="notification_text_format">Nouveau poids : %1$.1f kg (%2$s)</string>
+    <string name="status_notifications">Notifications</string>
+    <string name="btn_enable_notifications">Autoriser les notifications de synchronisation</string>
+    
+    <string name="status_hc">Health Connect</string>
+    <string name="status_garmin">Garmin Connect</string>
+    <string name="status_battery">Optimisation de la batterie</string>
+    <string name="status_battery_ok">Optimisé pour l’arrière-plan</string>
+    <string name="status_battery_fail">Restreint (peut échouer)</string>
+    <string name="status_connected">Connecté</string>
+    <string name="status_not_connected">Non connecté</string>
+    
+    <string name="title_status">État</string>
+    <string name="title_last_sync">Dernière synchronisation</string>
+    <string name="sync_uploaded_count">%1$d mesure(s) téléchargée(s)</string>
+    <string name="sync_never">Jamais</string>
+    
+    <string name="btn_grant_hc">Accorder les permissions Health Connect</string>
+    <string name="btn_allow_background">Autoriser l’exécution en arrière-plan (batterie)</string>
+    <string name="btn_connect_garmin">Se connecter à Garmin</string>
+    <string name="btn_sync_now">Synchroniser maintenant</string>
+    <string name="syncing_text">Synchronisation...</string>
+    <string name="footer_text">La synchronisation en arrière-plan s’exécute automatiquement toutes les heures.</string>
+</resources>

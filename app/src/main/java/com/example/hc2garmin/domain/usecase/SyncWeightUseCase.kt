@@ -53,6 +53,7 @@ class SyncWeightUseCase(
         }
 
         var uploadedCount = 0
+        var lastUploadedMeasurement: com.example.hc2garmin.domain.model.WeightMeasurement? = null
         for (record in records) {
             if (record.dateStr in existingDates) continue
 
@@ -61,6 +62,7 @@ class SyncWeightUseCase(
             val uploadResult = apiService.uploadFit(fitBytes, filename)
             if (uploadResult.isSuccess) {
                 uploadedCount++
+                lastUploadedMeasurement = record
             }
         }
 
@@ -68,6 +70,6 @@ class SyncWeightUseCase(
         prefs.setLastSyncCount(uploadedCount)
         if (prefs.isFirstRun()) prefs.setFirstRunComplete()
 
-        return SyncResult.Success(uploadedCount)
+        return SyncResult.Success(uploadedCount, lastUploadedMeasurement)
     }
 }

@@ -29,7 +29,12 @@ class SyncWorker(appContext: Context, params: WorkerParameters) :
         return when (val result = runCatching { useCase.execute() }.getOrElse {
             SyncResult.NetworkError(it.message)
         }) {
-            is SyncResult.Success -> Result.success()
+            is SyncResult.Success -> {
+                result.lastMeasurement?.let {
+                    NotificationHelper.showSyncNotification(applicationContext, it)
+                }
+                Result.success()
+            }
             is SyncResult.NetworkError -> Result.retry()
             is SyncResult.AuthError -> Result.failure()
             is SyncResult.PermissionError -> Result.failure()

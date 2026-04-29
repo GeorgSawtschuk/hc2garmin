@@ -52,7 +52,7 @@ adb logcat -s HC2Garmin
 
 ## Project Structure
 
-*   `app/src/main/java/com/example/hc2garmin/`
+*   `app/src/main/java/de/sawtschuk/hc2garmin/`
     *   `data/`: Implementation of FIT generation, Health Connect access, and Remote APIs.
     *   `domain/`: Models and Use Cases (business logic).
     *   `ui/`: Compose-based screens and ViewModels.

@@ -73,7 +73,7 @@ Full SSO response body is logged at every step. MFA type is in `"mfaLastMethodUs
 ## Project structure
 
 ```
-app/src/main/java/com/example/hc2garmin/
+app/src/main/java/de/sawtschuk/hc2garmin/
 ├── data/
 │   ├── fit/FitFileBuilder.kt          # Manual FIT binary generation
 │   ├── healthconnect/HealthConnectManager.kt

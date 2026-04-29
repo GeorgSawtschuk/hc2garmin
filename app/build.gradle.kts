@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.hc2garmin"
+    namespace = "de.sawtschuk.hc2garmin"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.hc2garmin"
+        applicationId = "de.sawtschuk.hc2garmin"
         minSdk = 34
         targetSdk = 36
         versionCode = 1

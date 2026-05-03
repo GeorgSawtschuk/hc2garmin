@@ -5,6 +5,7 @@
     <string name="notification_channel_description">Notifications after successful synchronization</string>
     <string name="notification_title">Weight synced</string>
     <string name="notification_text_format">New weight: %1$.1f kg (%2$s)</string>
+    <string name="notification_text_format_with_fat">New weight: %1$.1f kg, Fat: %2$.1f%% (%3$s)</string>
     <string name="status_notifications">Notifications</string>
     <string name="btn_enable_notifications">Allow sync notifications</string>
     

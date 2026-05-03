@@ -36,7 +36,16 @@ object NotificationHelper {
         val dateStr = formatter.format(Instant.ofEpochSecond(measurement.epochSeconds))
 
         val title = context.getString(R.string.notification_title)
-        val text = context.getString(R.string.notification_text_format, measurement.weightKg, dateStr)
+        val text = if (measurement.bodyFatPercentage != null) {
+            context.getString(
+                R.string.notification_text_format_with_fat,
+                measurement.weightKg,
+                measurement.bodyFatPercentage,
+                dateStr
+            )
+        } else {
+            context.getString(R.string.notification_text_format, measurement.weightKg, dateStr)
+        }
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)

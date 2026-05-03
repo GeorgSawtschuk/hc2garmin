@@ -99,7 +99,9 @@ class GarminAuthService(private val prefs: PreferencesManager) {
         val request = Request.Builder()
             .url(url)
             .post(bodyJson.toRequestBody("application/json".toMediaType()))
-            .addHeader("User-Agent", "GarminConnect/4 CFNetwork/1404.0.5 Darwin/22.3.0")
+            .addHeader("User-Agent", ANDROID_USER_AGENT)
+            .addHeader("X-Garmin-User-Agent", ANDROID_USER_AGENT)
+            .addHeader("X-Garmin-App-Version", "4.75")
             .addHeader("Accept", "application/json, text/plain, */*")
             .addHeader("Origin", "https://sso.garmin.com")
             .addHeader("Referer", "https://sso.garmin.com/")
@@ -188,7 +190,9 @@ class GarminAuthService(private val prefs: PreferencesManager) {
         val request = Request.Builder()
             .url(ssoUrl)
             .post(bodyJson.toRequestBody("application/json".toMediaType()))
-            .addHeader("User-Agent", "GarminConnect/4 CFNetwork/1404.0.5 Darwin/22.3.0")
+            .addHeader("User-Agent", ANDROID_USER_AGENT)
+            .addHeader("X-Garmin-User-Agent", ANDROID_USER_AGENT)
+            .addHeader("X-Garmin-App-Version", "4.75")
             .addHeader("Accept", "application/json, text/plain, */*")
             .addHeader("Origin", "https://sso.garmin.com")
             .build()
@@ -265,7 +269,11 @@ class GarminAuthService(private val prefs: PreferencesManager) {
 
         val response = client.newCall(request).execute()
         val bodyStr = response.body?.string() ?: throw Exception("Empty token response")
-        if (!response.isSuccessful) throw Exception("Token exchange failed ($clientId): HTTP ${response.code}")
+        
+        if (!response.isSuccessful) {
+            Log.e(TAG, "Token exchange failed ($clientId): HTTP ${response.code} body=$bodyStr")
+            throw Exception("Token exchange failed ($clientId): HTTP ${response.code}")
+        }
         return parseTokenResponse(bodyStr, clientId)
     }
 
@@ -307,5 +315,6 @@ class GarminAuthService(private val prefs: PreferencesManager) {
 
     companion object {
         private const val TAG = "HC2Garmin"
+        private const val ANDROID_USER_AGENT = "com.garmin.android.apps.connectmobile/4.75"
     }
 }

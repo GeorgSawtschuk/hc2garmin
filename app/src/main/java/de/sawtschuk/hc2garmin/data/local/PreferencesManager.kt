@@ -28,6 +28,10 @@ class PreferencesManager(context: Context) {
         prefs.edit().putString(KEY_EMAIL, email).putString(KEY_PASSWORD, password).apply()
     }
 
+    fun clearCredentials() {
+        prefs.edit().remove(KEY_EMAIL).remove(KEY_PASSWORD).apply()
+    }
+
     fun getEmail(): String? = prefs.getString(KEY_EMAIL, null)
     fun getPassword(): String? = prefs.getString(KEY_PASSWORD, null)
 
@@ -76,6 +80,14 @@ class PreferencesManager(context: Context) {
 
     fun resetLoginAttempts() {
         prefs.edit().putInt(KEY_LOGIN_ATTEMPTS, 0).putLong(KEY_LOGIN_WINDOW_START, 0L).apply()
+    }
+
+    fun clearRateLimit() {
+        prefs.edit()
+            .remove(KEY_RATE_LIMIT_UNTIL)
+            .remove(KEY_LOGIN_ATTEMPTS)
+            .remove(KEY_LOGIN_WINDOW_START)
+            .apply()
     }
 
     fun attemptsInCurrentWindow(): Int {

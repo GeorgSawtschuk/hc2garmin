@@ -6,15 +6,16 @@ object FitFileBuilder {
 
     private const val FIT_EPOCH_OFFSET = 631065600L  // seconds between 1970-01-01 and 1989-12-31
 
-    fun buildWeightFitFile(weightKg: Double, epochSeconds: Long): ByteArray {
+    fun buildWeightFitFile(weightKg: Double, fatPercent: Double?, epochSeconds: Long): ByteArray {
         val fitTs = (epochSeconds - FIT_EPOCH_OFFSET).toInt()
         val weightRaw = (weightKg * 100 + 0.5).toInt()  // uint16, scale=100, unit=kg
+        val fatRaw = if (fatPercent != null) (fatPercent * 100 + 0.5).toInt() else 0xFFFF
 
-        val payload = buildPayload(fitTs, weightRaw)
+        val payload = buildPayload(fitTs, weightRaw, fatRaw)
         return wrapInFitFile(payload)
     }
 
-    private fun buildPayload(fitTs: Int, weightRaw: Int): ByteArray {
+    private fun buildPayload(fitTs: Int, weightRaw: Int, fatRaw: Int): ByteArray {
         val buf = ByteArrayOutputStream()
 
         // Definition message for file_id (local 0, global message 0)
@@ -41,16 +42,19 @@ object FitFileBuilder {
         buf.write(0x00)          // reserved
         buf.write(0x00)          // architecture: little-endian
         buf.writeLE16(30)        // global message number: weight_scale
-        buf.write(2)             // number of fields
-        // field 253: timestamp, size=4, base_type=uint32(0x86)
+        buf.write(3)             // number of fields
+        // field 253: timestamp,   size=4, base_type=uint32(0x86)
         buf.write(253); buf.write(4);  buf.write(0x86)
-        // field 0:   weight,    size=2, base_type=uint16(0x84)
+        // field 0:   weight,      size=2, base_type=uint16(0x84)
         buf.write(0);   buf.write(2);  buf.write(0x84)
+        // field 1:   percent_fat, size=2, base_type=uint16(0x84)
+        buf.write(1);   buf.write(2);  buf.write(0x84)
 
         // Data message for weight_scale (local 1)
         buf.write(0x01)
         buf.writeLE32(fitTs)     // timestamp
         buf.writeLE16(weightRaw) // weight in units of 0.01 kg
+        buf.writeLE16(fatRaw)    // percent_fat in units of 0.01 %
 
         return buf.toByteArray()
     }

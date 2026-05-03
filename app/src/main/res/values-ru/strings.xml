@@ -5,6 +5,7 @@
     <string name="notification_channel_description">Уведомления после успешной синхронизации</string>
     <string name="notification_title">Вес синхронизирован</string>
     <string name="notification_text_format">Новый вес: %1$.1f кг (%2$s)</string>
+    <string name="notification_text_format_with_fat">Новый вес: %1$.1f кг, Жир: %2$.1f%% (%3$s)</string>
     <string name="status_notifications">Уведомления</string>
     <string name="btn_enable_notifications">Разрешить уведомления о синхронизации</string>
     

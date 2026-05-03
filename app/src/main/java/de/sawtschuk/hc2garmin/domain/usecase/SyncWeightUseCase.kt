@@ -23,8 +23,13 @@ class SyncWeightUseCase(
 
         val tokenResult = authService.ensureValidToken()
         if (tokenResult.isFailure) {
-            val msg = tokenResult.exceptionOrNull()?.message ?: "Auth failed"
-            return if (msg.contains("2FA")) SyncResult.AuthError(msg) else SyncResult.AuthError(msg)
+            val exception = tokenResult.exceptionOrNull()
+            val msg = exception?.message ?: "Auth failed"
+            return when (exception) {
+                is de.sawtschuk.hc2garmin.data.remote.MfaRequiredException -> SyncResult.AuthError("MFA_REQUIRED")
+                is de.sawtschuk.hc2garmin.data.remote.RateLimitedException -> SyncResult.NetworkError("RATE_LIMITED: $msg")
+                else -> SyncResult.AuthError(msg)
+            }
         }
 
         // Determine sync window: first run = 30 days, otherwise since last sync
@@ -57,7 +62,11 @@ class SyncWeightUseCase(
         for (record in records) {
             if (record.dateStr in existingDates) continue
 
-            val fitBytes = FitFileBuilder.buildWeightFitFile(record.weightKg, record.epochSeconds)
+            val fitBytes = FitFileBuilder.buildWeightFitFile(
+                record.weightKg,
+                record.bodyFatPercentage,
+                record.epochSeconds
+            )
             val filename = "weight_${record.epochSeconds}.fit"
             val uploadResult = apiService.uploadFit(fitBytes, filename)
             if (uploadResult.isSuccess) {

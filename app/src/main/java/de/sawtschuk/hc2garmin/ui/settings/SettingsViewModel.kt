@@ -167,6 +167,22 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissTestResult() { _state.value = _state.value.copy(testResult = null) }
 
+    fun logout() {
+        prefs.clearCredentials()
+        prefs.clearTokens()
+        _state.value = _state.value.copy(
+            email = "",
+            password = "",
+            testResult = null
+        )
+    }
+
+    fun clearRateLimit() {
+        prefs.clearRateLimit()
+        refreshAttemptCount()
+        _state.value = _state.value.copy(testResult = null)
+    }
+
     private fun friendlyError(msg: String) = when {
         msg.contains("401") || msg.contains("rejected") ->
             "Invalid email or password. Please check your Garmin Connect credentials."

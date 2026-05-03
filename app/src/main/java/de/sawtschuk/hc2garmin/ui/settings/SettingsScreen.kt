@@ -9,13 +9,21 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.AutofillNode
+import androidx.compose.ui.autofill.AutofillType
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalAutofill
+import androidx.compose.ui.platform.LocalAutofillTree
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -23,6 +31,9 @@ fun SettingsScreen(
 ) {
     val state by vm.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val autofill = LocalAutofill.current
+    val autofillTree = LocalAutofillTree.current
 
     LaunchedEffect(state.testResult) {
         when (val r = state.testResult) {
@@ -116,9 +127,26 @@ fun SettingsScreen(
                 value = state.email,
                 onValueChange = vm::onEmailChange,
                 label = { Text("Garmin Email") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Next,
+                    autoCorrect = false
+                ),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { coordinates ->
+                        autofillTree += AutofillNode(
+                            autofillTypes = listOf(AutofillType.EmailAddress, AutofillType.Username),
+                            onFill = vm::onEmailChange,
+                            boundingBox = coordinates.boundsInWindow()
+                        )
+                    }
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
+                            autofill?.requestAutofillForNode(autofillTree.children.values.last())
+                        }
+                    },
                 enabled = !state.isTesting
             )
 
@@ -127,9 +155,25 @@ fun SettingsScreen(
                 onValueChange = vm::onPasswordChange,
                 label = { Text("Garmin Password") },
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { coordinates ->
+                        autofillTree += AutofillNode(
+                            autofillTypes = listOf(AutofillType.Password),
+                            onFill = vm::onPasswordChange,
+                            boundingBox = coordinates.boundsInWindow()
+                        )
+                    }
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
+                            autofill?.requestAutofillForNode(autofillTree.children.values.last())
+                        }
+                    },
                 enabled = !state.isTesting
             )
 
@@ -155,8 +199,19 @@ fun SettingsScreen(
                         Spacer(Modifier.width(8.dp))
                         Text("Connecting...")
                     } else {
-                        Text("Connect to Garmin")
+                        Text("Connect")
                     }
+                }
+            }
+
+            if (state.email.isNotBlank() || state.password.isNotBlank()) {
+                TextButton(
+                    onClick = vm::logout,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    enabled = !state.isTesting
+                ) {
+                    Text("Clear Credentials / Logout")
                 }
             }
 
@@ -165,14 +220,24 @@ fun SettingsScreen(
                 state.attemptsLeft <= 1 -> MaterialTheme.colorScheme.error
                 else -> MaterialTheme.colorScheme.onSurfaceVariant
             }
-            Text(
-                text = if (state.isBlocked)
-                    "Login blocked: too many attempts. Try again in 1 hour."
-                else
-                    "${state.attemptsLeft} of ${state.maxAttempts} login attempts remaining",
-                style = MaterialTheme.typography.bodySmall,
-                color = attemptsColor
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = if (state.isBlocked)
+                        "Login blocked: too many attempts. Try again in 1 hour."
+                    else
+                        "${state.attemptsLeft} of ${state.maxAttempts} login attempts remaining",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = attemptsColor
+                )
+                if (state.attemptsUsed > 0 || state.isBlocked) {
+                    TextButton(
+                        onClick = vm::clearRateLimit,
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("Reset Rate Limit Counter", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
         }
     }
 }

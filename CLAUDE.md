@@ -12,6 +12,7 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 .\gradlew assembleDebug
 # APK: app\build\outputs\apk\debug\app-debug.apk
 
+# ADB path (if not in PATH): $env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 ```
 

@@ -4,6 +4,12 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+import java.util.Properties
+
+val gitVersion = providers.exec {
+    commandLine("git", "describe", "--tags", "--always", "--dirty")
+}.standardOutput.asText.getOrElse("1.0").trim()
+
 android {
     namespace = "de.sawtschuk.hc2garmin"
     compileSdk = 36
@@ -13,7 +19,9 @@ android {
         minSdk = 34
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = gitVersion
+
+        buildConfigField("String", "VERSION_NAME", "\"$gitVersion\"")
     }
 
     compileOptions {

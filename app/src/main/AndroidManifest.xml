@@ -9,9 +9,10 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Health Connect app package query -->
+    <!-- Health Connect and Garmin Connect app package queries -->
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
+        <package android:name="com.garmin.android.apps.connectmobile" />
     </queries>
 
     <application

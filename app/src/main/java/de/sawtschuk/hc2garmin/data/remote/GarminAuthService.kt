@@ -87,6 +87,8 @@ class GarminAuthService(private val prefs: PreferencesManager) {
             }
         }
 
+    private fun getUserAgent(): String = "$ANDROID_USER_AGENT_PREFIX/${prefs.getGarminVersion()}"
+
     private fun trySubmitMfa(url: String, mfaCode: String, mfaMethod: String): String? {
         val bodyJson = JSONObject().apply {
             put("mfaMethod", mfaMethod)
@@ -96,12 +98,14 @@ class GarminAuthService(private val prefs: PreferencesManager) {
             put("mfaSetup", false)
         }.toString()
 
+        val ua = getUserAgent()
+        val gVersion = prefs.getGarminVersion()
         val request = Request.Builder()
             .url(url)
             .post(bodyJson.toRequestBody("application/json".toMediaType()))
-            .addHeader("User-Agent", ANDROID_USER_AGENT)
-            .addHeader("X-Garmin-User-Agent", ANDROID_USER_AGENT)
-            .addHeader("X-Garmin-App-Version", "4.75")
+            .addHeader("User-Agent", ua)
+            .addHeader("X-Garmin-User-Agent", ua)
+            .addHeader("X-Garmin-App-Version", gVersion)
             .addHeader("Accept", "application/json, text/plain, */*")
             .addHeader("Origin", "https://sso.garmin.com")
             .addHeader("Referer", "https://sso.garmin.com/")
@@ -187,12 +191,14 @@ class GarminAuthService(private val prefs: PreferencesManager) {
         prefs.recordLoginAttempt()
         Log.d(TAG, "SSO attempt ${prefs.attemptsInCurrentWindow()}/${PreferencesManager.MAX_LOGIN_ATTEMPTS}")
 
+        val ua = getUserAgent()
+        val gVersion = prefs.getGarminVersion()
         val request = Request.Builder()
             .url(ssoUrl)
             .post(bodyJson.toRequestBody("application/json".toMediaType()))
-            .addHeader("User-Agent", ANDROID_USER_AGENT)
-            .addHeader("X-Garmin-User-Agent", ANDROID_USER_AGENT)
-            .addHeader("X-Garmin-App-Version", "4.75")
+            .addHeader("User-Agent", ua)
+            .addHeader("X-Garmin-User-Agent", ua)
+            .addHeader("X-Garmin-App-Version", gVersion)
             .addHeader("Accept", "application/json, text/plain, */*")
             .addHeader("Origin", "https://sso.garmin.com")
             .build()
@@ -315,6 +321,6 @@ class GarminAuthService(private val prefs: PreferencesManager) {
 
     companion object {
         private const val TAG = "HC2Garmin"
-        private const val ANDROID_USER_AGENT = "com.garmin.android.apps.connectmobile/4.75"
+        private const val ANDROID_USER_AGENT_PREFIX = "com.garmin.android.apps.connectmobile"
     }
 }

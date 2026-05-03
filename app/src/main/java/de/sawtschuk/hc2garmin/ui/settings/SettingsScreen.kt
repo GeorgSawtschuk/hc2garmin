@@ -23,6 +23,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
+import androidx.compose.ui.res.stringResource
+import de.sawtschuk.hc2garmin.R
+
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun SettingsScreen(
@@ -175,6 +178,32 @@ fun SettingsScreen(
                         }
                     },
                 enabled = !state.isTesting
+            )
+
+            OutlinedTextField(
+                value = state.garminVersion,
+                onValueChange = vm::onGarminVersionChange,
+                label = { Text(stringResource(R.string.label_garmin_version)) },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Done
+                ),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.isTesting,
+                supportingText = {
+                    Column {
+                        Text(stringResource(R.string.help_garmin_version))
+                        state.installedGarminVersion?.let {
+                            Text(
+                                text = stringResource(R.string.hint_installed_version, it),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                }
             )
 
             Row(

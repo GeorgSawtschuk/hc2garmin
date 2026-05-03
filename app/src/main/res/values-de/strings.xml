@@ -28,4 +28,8 @@
     <string name="btn_sync_now">Jetzt synchronisieren</string>
     <string name="syncing_text">Synchronisierung...</string>
     <string name="footer_text">Hintergrund-Synchronisierung läuft automatisch jede Stunde.</string>
+
+    <string name="label_garmin_version">Garmin App-Version</string>
+    <string name="help_garmin_version">Diese Versionsnummer wird verwendet, um die App gegenüber Garmin zu identifizieren. Standard ist 4.75. Ändern Sie dies nur, wenn die Verbindung mit einer Meldung über "zu viele Versuche" fehlschlägt.</string>
+    <string name="hint_installed_version">Auf Ihrem Handy erkannt: %1$s</string>
 </resources>

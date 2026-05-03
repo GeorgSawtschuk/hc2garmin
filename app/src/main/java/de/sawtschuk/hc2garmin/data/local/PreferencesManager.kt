@@ -57,6 +57,9 @@ class PreferencesManager(context: Context) {
     fun isFirstRun(): Boolean = !prefs.getBoolean(KEY_FIRST_RUN_DONE, false)
     fun setFirstRunComplete() { prefs.edit().putBoolean(KEY_FIRST_RUN_DONE, true).apply() }
 
+    fun getGarminVersion(): String = prefs.getString(KEY_GARMIN_VERSION, "4.75") ?: "4.75"
+    fun setGarminVersion(v: String) { prefs.edit().putString(KEY_GARMIN_VERSION, v).apply() }
+
     // Rate-limit from Garmin (429 response)
     fun getRateLimitUntil(): Long = prefs.getLong(KEY_RATE_LIMIT_UNTIL, 0L)
     fun setRateLimitUntil(epochMillis: Long) {
@@ -109,5 +112,6 @@ class PreferencesManager(context: Context) {
         private const val KEY_RATE_LIMIT_UNTIL = "rate_limit_until"
         private const val KEY_LOGIN_ATTEMPTS = "login_attempts"
         private const val KEY_LOGIN_WINDOW_START = "login_window_start"
+        private const val KEY_GARMIN_VERSION = "garmin_app_version"
     }
 }

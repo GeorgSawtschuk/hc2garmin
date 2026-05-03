@@ -17,6 +17,8 @@ import kotlinx.coroutines.launch
 data class SettingsUiState(
     val email: String = "",
     val password: String = "",
+    val garminVersion: String = "4.75",
+    val installedGarminVersion: String? = null,
     val isTesting: Boolean = false,
     val isMfaRequired: Boolean = false,
     val mfaCode: String = "",
@@ -49,8 +51,19 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         refreshAttemptCount()
         _state.value = _state.value.copy(
             email = prefs.getEmail() ?: "",
-            password = prefs.getPassword() ?: ""
+            password = prefs.getPassword() ?: "",
+            garminVersion = prefs.getGarminVersion(),
+            installedGarminVersion = detectInstalledGarminVersion()
         )
+    }
+
+    private fun detectInstalledGarminVersion(): String? {
+        return runCatching {
+            val packageInfo = getApplication<android.app.Application>()
+                .packageManager
+                .getPackageInfo("com.garmin.android.apps.connectmobile", 0)
+            packageInfo.versionName
+        }.getOrNull()
     }
 
     private fun refreshAttemptCount() {
@@ -62,12 +75,14 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onEmailChange(v: String) { _state.value = _state.value.copy(email = v, testResult = null) }
     fun onPasswordChange(v: String) { _state.value = _state.value.copy(password = v, testResult = null) }
+    fun onGarminVersionChange(v: String) { _state.value = _state.value.copy(garminVersion = v) }
     fun onMfaCodeChange(v: String) { _state.value = _state.value.copy(mfaCode = v.filter { it.isDigit() }.take(6)) }
 
     fun saveCredentials() {
         val s = _state.value
         if (s.email.isBlank() || s.password.isBlank()) return
         prefs.saveCredentials(s.email.trim(), s.password)
+        prefs.setGarminVersion(s.garminVersion.trim())
         prefs.clearTokens()
     }
 
@@ -78,6 +93,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         prefs.saveCredentials(s.email.trim(), s.password)
+        prefs.setGarminVersion(s.garminVersion.trim())
         prefs.clearTokens()
         _state.value = s.copy(isTesting = true, testResult = null)
         viewModelScope.launch {

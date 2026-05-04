@@ -99,6 +99,9 @@ fun MainScreen(
                             Text("000000", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                         }
                     )
+                    state.dialogError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             },
             confirmButton = {

@@ -43,6 +43,7 @@ fun SettingsScreen(
             is TestResult.Success -> {
                 snackbarHostState.showSnackbar("Connected to Garmin successfully!")
                 vm.dismissTestResult()
+                onBack() // Close settings on success
             }
             is TestResult.Error -> {
                 snackbarHostState.showSnackbar(r.message)
@@ -77,6 +78,9 @@ fun SettingsScreen(
                         ),
                         placeholder = { Text("000000", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }
                     )
+                    (state.testResult as? TestResult.Error)?.let {
+                        Text(it.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             },
             confirmButton = {

@@ -89,8 +89,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 lastSyncCount = prefs.getLastSyncCount()
             )
 
-            // Auto-schedule if everything is ready
-            if (hasHcPerm && hasCredentials) {
+            // Auto-schedule if everything is ready and NOT in the middle of authentication
+            if (hasHcPerm && isGarminAuth && !_state.value.showConnectDialog) {
                 SyncWorker.schedule(getApplication())
             }
         }

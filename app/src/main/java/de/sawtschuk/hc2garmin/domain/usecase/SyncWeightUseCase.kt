@@ -5,8 +5,8 @@ import de.sawtschuk.hc2garmin.data.healthconnect.HealthConnectManager
 import de.sawtschuk.hc2garmin.data.local.PreferencesManager
 import de.sawtschuk.hc2garmin.data.remote.GarminApiService
 import de.sawtschuk.hc2garmin.data.remote.GarminAuthService
+import de.sawtschuk.hc2garmin.domain.model.WeightMeasurement
 import de.sawtschuk.hc2garmin.domain.model.SyncResult
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -32,53 +32,50 @@ class SyncWeightUseCase(
             }
         }
 
-        // Determine sync window: first run = 30 days, otherwise since last sync
-        val sinceMillis = if (prefs.isFirstRun()) {
-            System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+        // Read only measurements newer than the last successfully uploaded one
+        val lastWeightTs = prefs.getLastWeightMeasTimestamp()
+        val sinceMillis = if (lastWeightTs == 0L) {
+            // First sync: start from today midnight (local time)
+            LocalDate.now(ZoneId.systemDefault())
+                .atStartOfDay(ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
         } else {
-            prefs.getLastSyncTimestamp().coerceAtLeast(
-                System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
-            )
+            lastWeightTs + 1L
         }
 
         val records = runCatching { hcManager.readWeightSince(sinceMillis) }
             .getOrElse { return SyncResult.NetworkError("Health Connect read failed: ${it.message}") }
 
         if (records.isEmpty()) {
-            if (prefs.isFirstRun()) prefs.setFirstRunComplete()
+            prefs.setLastSyncTimestamp(System.currentTimeMillis())
             return SyncResult.Success(0)
         }
 
-        val startDate = Instant.ofEpochMilli(sinceMillis).atZone(ZoneId.systemDefault()).toLocalDate()
-        val endDate = LocalDate.now(ZoneId.systemDefault())
-        val existingDates = runCatching {
-            apiService.fetchExistingWeightDates(startDate, endDate)
-        }.getOrElse { 
-            return SyncResult.NetworkError("Failed to fetch existing weights from Garmin: ${it.message}")
-        }
-
         var uploadedCount = 0
-        var lastUploadedMeasurement: de.sawtschuk.hc2garmin.domain.model.WeightMeasurement? = null
+        var lastUploadedMeasurement: WeightMeasurement? = null
+        var maxUploadedTs = lastWeightTs
         for (record in records) {
-            if (record.dateStr in existingDates) continue
-
             val fitBytes = FitFileBuilder.buildWeightFitFile(
                 record.weightKg,
                 record.bodyFatPercentage,
                 record.epochSeconds
             )
-            val filename = "weight_${record.epochSeconds}.fit"
-            val uploadResult = apiService.uploadFit(fitBytes, filename)
+            val uploadResult = apiService.uploadFit(fitBytes, "weight_${record.epochSeconds}.fit")
             if (uploadResult.isSuccess) {
                 uploadedCount++
                 lastUploadedMeasurement = record
+                // +999ms to cover the full second — avoids re-reading the same measurement
+                // on next sync due to sub-second precision in Health Connect timestamps
+                val recordTs = record.epochSeconds * 1000L + 999L
+                if (recordTs > maxUploadedTs) maxUploadedTs = recordTs
             }
         }
 
         prefs.setLastSyncTimestamp(System.currentTimeMillis())
         prefs.setLastSyncCount(uploadedCount)
-        if (prefs.isFirstRun()) prefs.setFirstRunComplete()
+        if (maxUploadedTs > lastWeightTs) prefs.setLastWeightMeasTimestamp(maxUploadedTs)
 
-        return SyncResult.Success(uploadedCount, lastUploadedMeasurement)
+        return SyncResult.Success(uploadedCount = uploadedCount, lastMeasurement = lastUploadedMeasurement)
     }
 }

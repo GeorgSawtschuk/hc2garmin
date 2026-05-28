@@ -3,9 +3,7 @@
     <string name="app_name">HC2Garmin</string>
     <string name="notification_channel_name">Synchronisation</string>
     <string name="notification_channel_description">Notifications après une synchronisation réussie</string>
-    <string name="notification_title">Poids synchronisé</string>
-    <string name="notification_text_format">Nouveau poids : %1$.1f kg (%2$s)</string>
-    <string name="notification_text_format_with_fat">Nouveau poids : %1$.1f kg, Gras : %2$.1f%% (%3$s)</string>
+    <string name="notification_title">HC2Garmin synchronisé</string>
     <string name="status_notifications">Notifications</string>
     <string name="btn_enable_notifications">Autoriser les notifications de synchronisation</string>
     
@@ -28,4 +26,13 @@
     <string name="btn_sync_now">Synchroniser maintenant</string>
     <string name="syncing_text">Synchronisation...</string>
     <string name="footer_text">La synchronisation en arrière-plan s’exécute automatiquement toutes les heures.</string>
+
+    <plurals name="notification_weight_synced">
+        <item quantity="one">%1$d poids</item>
+        <item quantity="other">%1$d poids</item>
+    </plurals>
+    <plurals name="notification_bp_synced">
+        <item quantity="one">%1$d tension artérielle</item>
+        <item quantity="other">%1$d tensions artérielles</item>
+    </plurals>
 </resources>

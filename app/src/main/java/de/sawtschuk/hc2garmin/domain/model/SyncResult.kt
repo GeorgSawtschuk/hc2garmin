@@ -2,7 +2,8 @@ package de.sawtschuk.hc2garmin.domain.model
 
 sealed class SyncResult {
     data class Success(
-        val uploadedCount: Int,
+        val uploadedCount: Int = 0,
+        val bpUploaded: Int = 0,
         val lastMeasurement: WeightMeasurement? = null
     ) : SyncResult()
     data class AuthError(val message: String?) : SyncResult()

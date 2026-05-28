@@ -3,9 +3,7 @@
     <string name="app_name">HC2Garmin</string>
     <string name="notification_channel_name">Синхронизация</string>
     <string name="notification_channel_description">Уведомления после успешной синхронизации</string>
-    <string name="notification_title">Вес синхронизирован</string>
-    <string name="notification_text_format">Новый вес: %1$.1f кг (%2$s)</string>
-    <string name="notification_text_format_with_fat">Новый вес: %1$.1f кг, Жир: %2$.1f%% (%3$s)</string>
+    <string name="notification_title">HC2Garmin синхронизирован</string>
     <string name="status_notifications">Уведомления</string>
     <string name="btn_enable_notifications">Разрешить уведомления о синхронизации</string>
     
@@ -28,4 +26,15 @@
     <string name="btn_sync_now">Синхронизировать сейчас</string>
     <string name="syncing_text">Синхронизация...</string>
     <string name="footer_text">Фоновая синхронизация запускается автоматически каждый час.</string>
+
+    <plurals name="notification_weight_synced">
+        <item quantity="one">%1$d вес</item>
+        <item quantity="few">%1$d веса</item>
+        <item quantity="other">%1$d весов</item>
+    </plurals>
+    <plurals name="notification_bp_synced">
+        <item quantity="one">%1$d давление</item>
+        <item quantity="few">%1$d давления</item>
+        <item quantity="other">%1$d давлений</item>
+    </plurals>
 </resources>

@@ -7,16 +7,16 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import de.sawtschuk.hc2garmin.R
 import de.sawtschuk.hc2garmin.domain.model.WeightMeasurement
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.*
 
 object NotificationHelper {
     private const val CHANNEL_ID = "sync_notifications"
     private const val NOTIFICATION_ID = 1001
 
-    fun showSyncNotification(context: Context, measurement: WeightMeasurement) {
+    fun showSyncNotification(
+        context: Context,
+        measurement: WeightMeasurement?,
+        bpCount: Int = 0
+    ) {
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -31,21 +31,9 @@ object NotificationHelper {
             notificationManager.createNotificationChannel(channel)
         }
 
-        val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm")
-            .withZone(ZoneId.systemDefault())
-        val dateStr = formatter.format(Instant.ofEpochSecond(measurement.epochSeconds))
-
         val title = context.getString(R.string.notification_title)
-        val text = if (measurement.bodyFatPercentage != null) {
-            context.getString(
-                R.string.notification_text_format_with_fat,
-                measurement.weightKg,
-                measurement.bodyFatPercentage,
-                dateStr
-            )
-        } else {
-            context.getString(R.string.notification_text_format, measurement.weightKg, dateStr)
-        }
+
+        val text = buildNotificationText(context, measurement, bpCount)
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -56,5 +44,21 @@ object NotificationHelper {
             .build()
 
         notificationManager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun buildNotificationText(
+        context: Context,
+        measurement: WeightMeasurement?,
+        bpCount: Int
+    ): String {
+        val weightPart = if (measurement != null) {
+            context.resources.getQuantityString(R.plurals.notification_weight_synced, 1, 1)
+        } else null
+
+        val bpPart = if (bpCount > 0) {
+            context.resources.getQuantityString(R.plurals.notification_bp_synced, bpCount, bpCount)
+        } else null
+
+        return listOfNotNull(weightPart, bpPart).joinToString(" · ")
     }
 }

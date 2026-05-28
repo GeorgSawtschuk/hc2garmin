@@ -8,8 +8,6 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
-import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
 class GarminApiService(private val authService: GarminAuthService) {
@@ -20,34 +18,6 @@ class GarminApiService(private val authService: GarminAuthService) {
         .build()
 
     private val baseUrl = "https://connectapi.garmin.com"
-
-    suspend fun fetchExistingWeightDates(startDate: LocalDate, endDate: LocalDate): Set<String> =
-        withContext(Dispatchers.IO) {
-            val token = authService.ensureValidToken().getOrThrow()
-            val url = "$baseUrl/weight-service/weight/dateRange" +
-                    "?startDate=$startDate&endDate=$endDate"
-
-            val request = Request.Builder()
-                .url(url)
-                .get()
-                .addHeader("Authorization", "Bearer $token")
-                .addHeader("DI-Backend", "connectapi.garmin.com")
-                .addHeader("Accept", "application/json")
-                .build()
-
-            val response = client.newCall(request).execute()
-            val body = response.body?.string() ?: return@withContext emptySet()
-
-            if (!response.isSuccessful) return@withContext emptySet()
-
-            val json = JSONObject(body)
-            val list = json.optJSONArray("dateWeightList") ?: return@withContext emptySet()
-            buildSet {
-                for (i in 0 until list.length()) {
-                    list.optJSONObject(i)?.optString("calendarDate")?.let { add(it) }
-                }
-            }
-        }
 
     suspend fun uploadFit(fitBytes: ByteArray, filename: String): Result<Unit> =
         withContext(Dispatchers.IO) {
@@ -74,6 +44,7 @@ class GarminApiService(private val authService: GarminAuthService) {
                 val response = client.newCall(request).execute()
                 val responseBody = response.body?.string() ?: ""
 
+                android.util.Log.d("HC2Garmin", "Upload $filename → HTTP ${response.code}: ${responseBody.take(300)}")
                 when (response.code) {
                     200, 201 -> Unit
                     409 -> Unit  // duplicate — treat as success

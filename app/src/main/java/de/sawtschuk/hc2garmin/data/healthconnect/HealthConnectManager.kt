@@ -3,16 +3,19 @@ package de.sawtschuk.hc2garmin.data.healthconnect
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.BloodPressureRecord
 import androidx.health.connect.client.records.BodyFatRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import de.sawtschuk.hc2garmin.domain.model.BloodPressureMeasurement
 import de.sawtschuk.hc2garmin.domain.model.WeightMeasurement
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 class HealthConnectManager(private val context: Context) {
 
@@ -23,6 +26,7 @@ class HealthConnectManager(private val context: Context) {
     val requiredPermissions: Set<String> = setOf(
         HealthPermission.getReadPermission(WeightRecord::class),
         HealthPermission.getReadPermission(BodyFatRecord::class),
+        HealthPermission.getReadPermission(BloodPressureRecord::class),
         "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
     )
 
@@ -56,12 +60,11 @@ class HealthConnectManager(private val context: Context) {
 
             weightRecords.map { weightRecord ->
                 val date = weightRecord.time.atZone(ZoneId.systemDefault()).toLocalDate().toString()
-                
-                // Find matching fat record within 1 minute
-                val matchingFat = fatRecords.minByOrNull { 
-                    abs(it.time.epochSecond - weightRecord.time.epochSecond) 
-                }?.takeIf { 
-                    abs(it.time.epochSecond - weightRecord.time.epochSecond) < 60 
+
+                val matchingFat = fatRecords.minByOrNull {
+                    abs(it.time.epochSecond - weightRecord.time.epochSecond)
+                }?.takeIf {
+                    abs(it.time.epochSecond - weightRecord.time.epochSecond) < 60
                 }
 
                 WeightMeasurement(
@@ -69,6 +72,28 @@ class HealthConnectManager(private val context: Context) {
                     weightKg = weightRecord.weight.inKilograms,
                     bodyFatPercentage = matchingFat?.percentage?.value,
                     dateStr = date
+                )
+            }
+        }
+
+    suspend fun readBloodPressureSince(sinceEpochMillis: Long): List<BloodPressureMeasurement> =
+        withContext(Dispatchers.IO) {
+            val start = Instant.ofEpochMilli(sinceEpochMillis)
+            val end = Instant.now()
+
+            val records = client.readRecords(
+                ReadRecordsRequest(
+                    recordType = BloodPressureRecord::class,
+                    timeRangeFilter = TimeRangeFilter.between(start, end)
+                )
+            ).records
+
+            records.map { r ->
+                BloodPressureMeasurement(
+                    epochSeconds = r.time.epochSecond,
+                    systolicMmhg = r.systolic.inMillimetersOfMercury.roundToInt(),
+                    diastolicMmhg = r.diastolic.inMillimetersOfMercury.roundToInt(),
+                    dateStr = r.time.atZone(ZoneId.systemDefault()).toLocalDate().toString()
                 )
             }
         }

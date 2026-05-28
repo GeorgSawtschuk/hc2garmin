@@ -3,9 +3,7 @@
     <string name="app_name">HC2Garmin</string>
     <string name="notification_channel_name">Sync</string>
     <string name="notification_channel_description">Notifications after successful synchronization</string>
-    <string name="notification_title">Weight synced</string>
-    <string name="notification_text_format">New weight: %1$.1f kg (%2$s)</string>
-    <string name="notification_text_format_with_fat">New weight: %1$.1f kg, Fat: %2$.1f%% (%3$s)</string>
+    <string name="notification_title">HC2Garmin synced</string>
     <string name="status_notifications">Notifications</string>
     <string name="btn_enable_notifications">Allow sync notifications</string>
     
@@ -28,6 +26,15 @@
     <string name="btn_sync_now">Sync Now</string>
     <string name="syncing_text">Syncing...</string>
     <string name="footer_text">Background sync runs automatically every hour.</string>
+
+    <plurals name="notification_weight_synced">
+        <item quantity="one">%1$d weight</item>
+        <item quantity="other">%1$d weights</item>
+    </plurals>
+    <plurals name="notification_bp_synced">
+        <item quantity="one">%1$d blood pressure</item>
+        <item quantity="other">%1$d blood pressure</item>
+    </plurals>
 
     <string name="label_garmin_version">Garmin App Version</string>
     <string name="help_garmin_version">This version number is used to identify the app to Garmin. Default is 4.75. Only change this if connection fails with a "too many attempts" error.</string>

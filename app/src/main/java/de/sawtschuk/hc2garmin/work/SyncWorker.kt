@@ -13,6 +13,7 @@ import de.sawtschuk.hc2garmin.data.local.PreferencesManager
 import de.sawtschuk.hc2garmin.data.remote.GarminApiService
 import de.sawtschuk.hc2garmin.data.remote.GarminAuthService
 import de.sawtschuk.hc2garmin.domain.model.SyncResult
+import de.sawtschuk.hc2garmin.domain.usecase.SyncBloodPressureUseCase
 import de.sawtschuk.hc2garmin.domain.usecase.SyncWeightUseCase
 import java.util.concurrent.TimeUnit
 
@@ -24,22 +25,35 @@ class SyncWorker(appContext: Context, params: WorkerParameters) :
         val authService = GarminAuthService(prefs)
         val apiService = GarminApiService(authService)
         val hcManager = HealthConnectManager(applicationContext)
-        val useCase = SyncWeightUseCase(prefs, authService, apiService, hcManager)
 
-        return when (val result = runCatching { useCase.execute() }.getOrElse {
-            SyncResult.NetworkError(it.message)
-        }) {
-            is SyncResult.Success -> {
-                result.lastMeasurement?.let {
-                    NotificationHelper.showSyncNotification(applicationContext, it)
-                }
-                Result.success()
-            }
-            is SyncResult.NetworkError -> Result.retry()
-            is SyncResult.AuthError -> Result.failure()
-            is SyncResult.PermissionError -> Result.failure()
-            is SyncResult.NoCredentials -> Result.failure()
+        val weightUseCase = SyncWeightUseCase(prefs, authService, apiService, hcManager)
+        val bpUseCase = SyncBloodPressureUseCase(prefs, authService, apiService, hcManager)
+
+        val weightResult = runCatching { weightUseCase.execute() }
+            .getOrElse { SyncResult.NetworkError(it.message) }
+        val bpResult = runCatching { bpUseCase.execute() }
+            .getOrElse { SyncResult.NetworkError(it.message) }
+
+        // Only retry on weight network errors; BP errors are logged but don't block the worker
+        if (weightResult is SyncResult.NetworkError) {
+            return Result.retry()
         }
+        if (weightResult is SyncResult.AuthError || weightResult is SyncResult.PermissionError ||
+            weightResult is SyncResult.NoCredentials) {
+            return Result.failure()
+        }
+
+        val weightSuccess = weightResult as? SyncResult.Success
+        val bpSuccess = bpResult as? SyncResult.Success
+
+        val totalBp = bpSuccess?.bpUploaded ?: 0
+        weightSuccess?.lastMeasurement?.let {
+            NotificationHelper.showSyncNotification(applicationContext, it, totalBp)
+        } ?: run {
+            if (totalBp > 0) NotificationHelper.showSyncNotification(applicationContext, null, totalBp)
+        }
+
+        return Result.success()
     }
 
     companion object {
@@ -60,8 +74,5 @@ class SyncWorker(appContext: Context, params: WorkerParameters) :
             )
         }
 
-        fun cancelAll(context: Context) {
-            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
-        }
     }
 }

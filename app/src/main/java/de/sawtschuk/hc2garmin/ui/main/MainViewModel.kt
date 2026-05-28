@@ -16,6 +16,7 @@ import de.sawtschuk.hc2garmin.data.remote.GarminAuthService
 import de.sawtschuk.hc2garmin.data.remote.MfaRequiredException
 import de.sawtschuk.hc2garmin.data.remote.RateLimitedException
 import de.sawtschuk.hc2garmin.domain.model.SyncResult
+import de.sawtschuk.hc2garmin.domain.usecase.SyncBloodPressureUseCase
 import de.sawtschuk.hc2garmin.domain.usecase.SyncWeightUseCase
 import de.sawtschuk.hc2garmin.work.SyncWorker
 import de.sawtschuk.hc2garmin.work.NotificationHelper
@@ -217,20 +218,38 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun triggerManualSync() {
         _state.value = _state.value.copy(isSyncing = true, syncError = null)
         viewModelScope.launch {
-            val useCase = SyncWeightUseCase(prefs, authService, apiService, hcManager)
-            val result = runCatching { useCase.execute() }.getOrElse { SyncResult.NetworkError(it.message) }
+            val weightUseCase = SyncWeightUseCase(prefs, authService, apiService, hcManager)
+            val bpUseCase = SyncBloodPressureUseCase(prefs, authService, apiService, hcManager)
 
-            val error: String? = when (result) {
+            val weightResult = runCatching { weightUseCase.execute() }.getOrElse { SyncResult.NetworkError(it.message) }
+            val bpResult = runCatching { bpUseCase.execute() }.getOrElse { SyncResult.NetworkError(it.message) }
+
+            val bpUploaded = (bpResult as? SyncResult.Success)?.bpUploaded ?: 0
+
+            val error: String? = when (weightResult) {
                 is SyncResult.Success -> {
-                    result.lastMeasurement?.let {
-                        NotificationHelper.showSyncNotification(getApplication(), it)
+                    weightResult.lastMeasurement?.let {
+                        NotificationHelper.showSyncNotification(getApplication(), it, bpUploaded)
+                    } ?: run {
+                        if (bpUploaded > 0) NotificationHelper.showSyncNotification(getApplication(), null, bpUploaded)
                     }
-                    null
+                    if (bpResult is SyncResult.NetworkError) "Network error (blood pressure): ${bpResult.message}"
+                    else null
                 }
-                is SyncResult.AuthError -> "Garmin auth error: ${result.message}"
-                is SyncResult.NetworkError -> "Network error: ${result.message}"
+                is SyncResult.AuthError -> "Garmin auth error: ${weightResult.message}"
+                is SyncResult.NetworkError -> "Network error: ${weightResult.message}"
                 is SyncResult.PermissionError -> "Health Connect permission required"
                 is SyncResult.NoCredentials -> "Please configure Garmin credentials in Settings"
+            }
+
+            val weightUploaded = (weightResult as? SyncResult.Success)?.uploadedCount ?: 0
+            val bpTotal = (bpResult as? SyncResult.Success)?.bpUploaded ?: 0
+            val totalUploaded = weightUploaded + bpTotal
+
+            // Always update count so the UI reflects the combined result
+            if (weightResult is SyncResult.Success || bpResult is SyncResult.Success) {
+                prefs.setLastSyncTimestamp(System.currentTimeMillis())
+                prefs.setLastSyncCount(totalUploaded)
             }
 
             val ts = prefs.getLastSyncTimestamp()
@@ -245,10 +264,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 isGarminAuthenticated = prefs.getTokens()?.isAccessTokenExpired() == false
             )
         }
-    }
-
-    fun scheduleBackgroundSync() {
-        SyncWorker.schedule(getApplication())
     }
 
     fun dismissError() { _state.value = _state.value.copy(syncError = null) }

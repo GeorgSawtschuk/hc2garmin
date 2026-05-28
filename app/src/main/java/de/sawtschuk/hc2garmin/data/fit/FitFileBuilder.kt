@@ -6,16 +6,31 @@ object FitFileBuilder {
 
     private const val FIT_EPOCH_OFFSET = 631065600L  // seconds between 1970-01-01 and 1989-12-31
 
-    fun buildWeightFitFile(weightKg: Double, fatPercent: Double?, epochSeconds: Long): ByteArray {
+    fun buildWeightFitFile(
+        weightKg: Double,
+        fatPercent: Double?,
+        epochSeconds: Long
+    ): ByteArray {
         val fitTs = (epochSeconds - FIT_EPOCH_OFFSET).toInt()
         val weightRaw = (weightKg * 100 + 0.5).toInt()  // uint16, scale=100, unit=kg
         val fatRaw = if (fatPercent != null) (fatPercent * 100 + 0.5).toInt() else 0xFFFF
 
-        val payload = buildPayload(fitTs, weightRaw, fatRaw)
+        val payload = buildWeightPayload(fitTs, weightRaw, fatRaw)
         return wrapInFitFile(payload)
     }
 
-    private fun buildPayload(fitTs: Int, weightRaw: Int, fatRaw: Int): ByteArray {
+    fun buildBloodPressureFitFile(
+        systolicMmhg: Int,
+        diastolicMmhg: Int,
+        epochSeconds: Long,
+        heartRateBpm: Int = 72
+    ): ByteArray {
+        val fitTs = (epochSeconds - FIT_EPOCH_OFFSET).toInt()
+        val payload = buildBloodPressurePayload(fitTs, systolicMmhg, diastolicMmhg, heartRateBpm)
+        return wrapInFitFile(payload)
+    }
+
+    private fun buildWeightPayload(fitTs: Int, weightRaw: Int, fatRaw: Int): ByteArray {
         val buf = ByteArrayOutputStream()
 
         // Definition message for file_id (local 0, global message 0)
@@ -24,12 +39,9 @@ object FitFileBuilder {
         buf.write(0x00)          // architecture: little-endian
         buf.writeLE16(0)         // global message number: file_id
         buf.write(3)             // number of fields
-        // field 0: type,         size=1, base_type=enum(0x00)
-        buf.write(0);  buf.write(1);  buf.write(0x00)
-        // field 1: manufacturer, size=2, base_type=uint16(0x84)
-        buf.write(1);  buf.write(2);  buf.write(0x84)
-        // field 4: time_created, size=4, base_type=uint32(0x86)
-        buf.write(4);  buf.write(4);  buf.write(0x86)
+        buf.write(0);  buf.write(1);  buf.write(0x00)  // field 0: type, enum
+        buf.write(1);  buf.write(2);  buf.write(0x84)  // field 1: manufacturer, uint16
+        buf.write(4);  buf.write(4);  buf.write(0x86)  // field 4: time_created, uint32
 
         // Data message for file_id (local 0)
         buf.write(0x00)
@@ -38,23 +50,68 @@ object FitFileBuilder {
         buf.writeLE32(fitTs)     // time_created
 
         // Definition message for weight_scale (local 1, global message 30)
-        buf.write(0x41)          // definition record header, local 1
-        buf.write(0x00)          // reserved
-        buf.write(0x00)          // architecture: little-endian
-        buf.writeLE16(30)        // global message number: weight_scale
-        buf.write(3)             // number of fields
-        // field 253: timestamp,   size=4, base_type=uint32(0x86)
-        buf.write(253); buf.write(4);  buf.write(0x86)
-        // field 0:   weight,      size=2, base_type=uint16(0x84)
-        buf.write(0);   buf.write(2);  buf.write(0x84)
-        // field 1:   percent_fat, size=2, base_type=uint16(0x84)
-        buf.write(1);   buf.write(2);  buf.write(0x84)
+        buf.write(0x41)
+        buf.write(0x00)
+        buf.write(0x00)
+        buf.writeLE16(30)
+        buf.write(3)
+        buf.write(253); buf.write(4);  buf.write(0x86)  // timestamp, uint32
+        buf.write(0);   buf.write(2);  buf.write(0x84)  // weight, uint16
+        buf.write(1);   buf.write(2);  buf.write(0x84)  // percent_fat, uint16
 
         // Data message for weight_scale (local 1)
         buf.write(0x01)
-        buf.writeLE32(fitTs)     // timestamp
-        buf.writeLE16(weightRaw) // weight in units of 0.01 kg
-        buf.writeLE16(fatRaw)    // percent_fat in units of 0.01 %
+        buf.writeLE32(fitTs)
+        buf.writeLE16(weightRaw)
+        buf.writeLE16(fatRaw)
+
+        return buf.toByteArray()
+    }
+
+    private fun buildBloodPressurePayload(
+        fitTs: Int,
+        systolicMmhg: Int,
+        diastolicMmhg: Int,
+        heartRateBpm: Int
+    ): ByteArray {
+        val mapMmhg = diastolicMmhg + (systolicMmhg - diastolicMmhg) / 3
+        val buf = ByteArrayOutputStream()
+
+        // Definition message for file_id (local 0, global message 0)
+        buf.write(0x40)          // definition record header, local 0
+        buf.write(0x00)          // reserved
+        buf.write(0x00)          // architecture: little-endian
+        buf.writeLE16(0)         // global message number: file_id
+        buf.write(3)             // number of fields
+        buf.write(0);  buf.write(1);  buf.write(0x00)  // field 0: type, enum
+        buf.write(1);  buf.write(2);  buf.write(0x84)  // field 1: manufacturer, uint16
+        buf.write(4);  buf.write(4);  buf.write(0x86)  // field 4: time_created, uint32
+
+        // Data message for file_id (local 0)
+        buf.write(0x00)
+        buf.write(14)            // type = 14 = blood_pressure file
+        buf.writeLE16(255)       // manufacturer = 255 (unknown/development)
+        buf.writeLE32(fitTs)     // time_created
+
+        // Definition message for blood_pressure (local 1, global message 51)
+        buf.write(0x41)          // definition record header, local 1
+        buf.write(0x00)          // reserved
+        buf.write(0x00)          // architecture: little-endian
+        buf.writeLE16(51)        // global message number: blood_pressure
+        buf.write(5)             // number of fields
+        buf.write(253); buf.write(4); buf.write(0x86)  // field 253: timestamp, uint32
+        buf.write(0);   buf.write(2); buf.write(0x84)  // field 0: systolic_pressure, uint16, mmHg
+        buf.write(1);   buf.write(2); buf.write(0x84)  // field 1: diastolic_pressure, uint16, mmHg
+        buf.write(2);   buf.write(2); buf.write(0x84)  // field 2: mean_arterial_pressure, uint16, mmHg
+        buf.write(6);   buf.write(1); buf.write(0x02)  // field 6: heart_rate, uint8, bpm
+
+        // Data message for blood_pressure (local 1)
+        buf.write(0x01)
+        buf.writeLE32(fitTs)
+        buf.writeLE16(systolicMmhg)
+        buf.writeLE16(diastolicMmhg)
+        buf.writeLE16(mapMmhg)
+        buf.write(heartRateBpm and 0xFF)
 
         return buf.toByteArray()
     }
@@ -62,7 +119,6 @@ object FitFileBuilder {
     private fun wrapInFitFile(payload: ByteArray): ByteArray {
         val result = ByteArrayOutputStream()
 
-        // Write 12-byte header body (without CRC)
         val hdrBuf = ByteArrayOutputStream()
         hdrBuf.write(0x0E)        // header size = 14
         hdrBuf.write(0x20)        // protocol version 2.0

@@ -3,9 +3,7 @@
     <string name="app_name">HC2Garmin</string>
     <string name="notification_channel_name">Synchronisierung</string>
     <string name="notification_channel_description">Benachrichtigungen nach erfolgreicher Synchronisation</string>
-    <string name="notification_title">Gewicht synchronisiert</string>
-    <string name="notification_text_format">Neues Gewicht: %1$.1f kg (%2$s)</string>
-    <string name="notification_text_format_with_fat">Neues Gewicht: %1$.1f kg, Fett: %2$.1f%% (%3$s)</string>
+    <string name="notification_title">HC2Garmin synchronisiert</string>
     <string name="status_notifications">Benachrichtigungen</string>
     <string name="btn_enable_notifications">Sync-Benachrichtigungen erlauben</string>
     
@@ -32,4 +30,13 @@
     <string name="label_garmin_version">Garmin App-Version</string>
     <string name="help_garmin_version">Diese Versionsnummer wird verwendet, um die App gegenüber Garmin zu identifizieren. Standard ist 4.75. Ändern Sie dies nur, wenn die Verbindung mit einer Meldung über "zu viele Versuche" fehlschlägt.</string>
     <string name="hint_installed_version">Auf Ihrem Handy erkannt: %1$s</string>
+
+    <plurals name="notification_weight_synced">
+        <item quantity="one">%1$d Gewicht</item>
+        <item quantity="other">%1$d Gewichte</item>
+    </plurals>
+    <plurals name="notification_bp_synced">
+        <item quantity="one">%1$d Blutdruck</item>
+        <item quantity="other">%1$d Blutdruck</item>
+    </plurals>
 </resources>

@@ -7,3 +7,5 @@
 
 # Local SDK path — machine-specific
 local.properties
+
+/.idea/

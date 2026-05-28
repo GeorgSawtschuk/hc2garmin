@@ -56,7 +56,8 @@ class SyncBloodPressureUseCase(
         var maxUploadedTs = lastBpTs
         for (record in records) {
             val fitBytes = FitFileBuilder.buildBloodPressureFitFile(
-                record.systolicMmhg, record.diastolicMmhg, record.epochSeconds
+                record.systolicMmhg, record.diastolicMmhg, record.epochSeconds,
+                record.heartRateBpm ?: 72
             )
             val result = apiService.uploadFit(fitBytes, "bp_${record.epochSeconds}.fit")
             if (result.isSuccess) {

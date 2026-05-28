@@ -4,5 +4,6 @@ data class BloodPressureMeasurement(
     val epochSeconds: Long,
     val systolicMmhg: Int,
     val diastolicMmhg: Int,
-    val dateStr: String  // YYYY-MM-DD, used for Garmin dedup
+    val heartRateBpm: Int? = null,
+    val dateStr: String
 )

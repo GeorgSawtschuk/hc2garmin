@@ -5,6 +5,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.BloodPressureRecord
 import androidx.health.connect.client.records.BodyFatRecord
+import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -27,6 +28,7 @@ class HealthConnectManager(private val context: Context) {
         HealthPermission.getReadPermission(WeightRecord::class),
         HealthPermission.getReadPermission(BodyFatRecord::class),
         HealthPermission.getReadPermission(BloodPressureRecord::class),
+        HealthPermission.getReadPermission(RestingHeartRateRecord::class),
         "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
     )
 
@@ -88,11 +90,26 @@ class HealthConnectManager(private val context: Context) {
                 )
             ).records
 
+            val restingHrRecords = runCatching {
+                client.readRecords(
+                    ReadRecordsRequest(
+                        recordType = RestingHeartRateRecord::class,
+                        timeRangeFilter = TimeRangeFilter.between(start, end)
+                    )
+                ).records
+            }.getOrElse { emptyList() }
+
             records.map { r ->
+                val hr = restingHrRecords
+                    .minByOrNull { abs(it.time.epochSecond - r.time.epochSecond) }
+                    ?.takeIf { abs(it.time.epochSecond - r.time.epochSecond) <= 60 }
+                    ?.beatsPerMinute?.toInt()
+
                 BloodPressureMeasurement(
                     epochSeconds = r.time.epochSecond,
                     systolicMmhg = r.systolic.inMillimetersOfMercury.roundToInt(),
                     diastolicMmhg = r.diastolic.inMillimetersOfMercury.roundToInt(),
+                    heartRateBpm = hr,
                     dateStr = r.time.atZone(ZoneId.systemDefault()).toLocalDate().toString()
                 )
             }

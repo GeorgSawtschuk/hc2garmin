@@ -19,6 +19,7 @@ import de.sawtschuk.hc2garmin.domain.model.SyncResult
 import de.sawtschuk.hc2garmin.domain.usecase.SyncBloodPressureUseCase
 import de.sawtschuk.hc2garmin.domain.usecase.SyncWeightUseCase
 import de.sawtschuk.hc2garmin.work.SyncWorker
+import de.sawtschuk.hc2garmin.work.SyncCoordinator
 import de.sawtschuk.hc2garmin.work.NotificationHelper
 import de.sawtschuk.hc2garmin.R
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -225,52 +226,58 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun triggerManualSync() {
         _state.value = _state.value.copy(isSyncing = true, syncError = null)
         viewModelScope.launch {
-            val weightUseCase = SyncWeightUseCase(prefs, authService, apiService, hcManager)
-            val bpUseCase = SyncBloodPressureUseCase(prefs, authService, apiService, hcManager)
-
-            val weightResult = runCatching { weightUseCase.execute() }.getOrElse { SyncResult.NetworkError(it.message) }
-            val bpResult = runCatching { bpUseCase.execute() }.getOrElse { SyncResult.NetworkError(it.message) }
-
-            val bpUploaded = (bpResult as? SyncResult.Success)?.bpUploaded ?: 0
-
-            val error: String? = when (weightResult) {
-                is SyncResult.Success -> {
-                    weightResult.lastMeasurement?.let {
-                        NotificationHelper.showSyncNotification(getApplication(), it, bpUploaded)
-                    } ?: run {
-                        if (bpUploaded > 0) NotificationHelper.showSyncNotification(getApplication(), null, bpUploaded)
-                    }
-                    if (bpResult is SyncResult.NetworkError) "Network error (blood pressure): ${bpResult.message}"
-                    else null
-                }
-                is SyncResult.AuthError -> "Garmin auth error: ${weightResult.message}"
-                is SyncResult.NetworkError -> "Network error: ${weightResult.message}"
-                is SyncResult.PermissionError -> "Health Connect permission required"
-                is SyncResult.NoCredentials -> "Please configure Garmin credentials in Settings"
+            SyncCoordinator.runExclusive {
+                runManualSync()
             }
-
-            val weightUploaded = (weightResult as? SyncResult.Success)?.uploadedCount ?: 0
-            val bpTotal = (bpResult as? SyncResult.Success)?.bpUploaded ?: 0
-            val totalUploaded = weightUploaded + bpTotal
-
-            // Always update count so the UI reflects the combined result
-            if (weightResult is SyncResult.Success || bpResult is SyncResult.Success) {
-                prefs.setLastSyncTimestamp(System.currentTimeMillis())
-                prefs.setLastSyncCount(totalUploaded)
-            }
-
-            val ts = prefs.getLastSyncTimestamp()
-            val tsText = if (ts == 0L) getApplication<Application>().getString(R.string.sync_never)
-            else DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(ts))
-
-            _state.value = _state.value.copy(
-                isSyncing = false,
-                syncError = error,
-                lastSyncText = tsText,
-                lastSyncCount = prefs.getLastSyncCount(),
-                isGarminAuthenticated = prefs.getTokens()?.isAccessTokenExpired() == false
-            )
         }
+    }
+
+    private suspend fun runManualSync() {
+        val weightUseCase = SyncWeightUseCase(prefs, authService, apiService, hcManager)
+        val bpUseCase = SyncBloodPressureUseCase(prefs, authService, apiService, hcManager)
+
+        val weightResult = runCatching { weightUseCase.execute() }.getOrElse { SyncResult.NetworkError(it.message) }
+        val bpResult = runCatching { bpUseCase.execute() }.getOrElse { SyncResult.NetworkError(it.message) }
+
+        val bpUploaded = (bpResult as? SyncResult.Success)?.bpUploaded ?: 0
+
+        val error: String? = when (weightResult) {
+            is SyncResult.Success -> {
+                weightResult.lastMeasurement?.let {
+                    NotificationHelper.showSyncNotification(getApplication(), it, bpUploaded)
+                } ?: run {
+                    if (bpUploaded > 0) NotificationHelper.showSyncNotification(getApplication(), null, bpUploaded)
+                }
+                if (bpResult is SyncResult.NetworkError) "Network error (blood pressure): ${bpResult.message}"
+                else null
+            }
+            is SyncResult.AuthError -> "Garmin auth error: ${weightResult.message}"
+            is SyncResult.NetworkError -> "Network error: ${weightResult.message}"
+            is SyncResult.PermissionError -> "Health Connect permission required"
+            is SyncResult.NoCredentials -> "Please configure Garmin credentials in Settings"
+        }
+
+        val weightUploaded = (weightResult as? SyncResult.Success)?.uploadedCount ?: 0
+        val bpTotal = (bpResult as? SyncResult.Success)?.bpUploaded ?: 0
+        val totalUploaded = weightUploaded + bpTotal
+
+        // Always update count so the UI reflects the combined result
+        if (weightResult is SyncResult.Success || bpResult is SyncResult.Success) {
+            prefs.setLastSyncTimestamp(System.currentTimeMillis())
+            prefs.setLastSyncCount(totalUploaded)
+        }
+
+        val ts = prefs.getLastSyncTimestamp()
+        val tsText = if (ts == 0L) getApplication<Application>().getString(R.string.sync_never)
+        else DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(ts))
+
+        _state.value = _state.value.copy(
+            isSyncing = false,
+            syncError = error,
+            lastSyncText = tsText,
+            lastSyncCount = prefs.getLastSyncCount(),
+            isGarminAuthenticated = prefs.getTokens()?.isAccessTokenExpired() == false
+        )
     }
 
     fun onHistoryPermissionResult(granted: Boolean) {
@@ -296,34 +303,75 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
         _state.value = current.copy(isImportingHistory = true, syncError = null)
         viewModelScope.launch {
-            val weightUseCase = SyncWeightUseCase(prefs, authService, apiService, hcManager)
-            val bpUseCase = SyncBloodPressureUseCase(prefs, authService, apiService, hcManager)
+            SyncCoordinator.runExclusive {
+                runHistoryImport()
+            }
+        }
+    }
 
-            val weightResult = runCatching { weightUseCase.execute(ALL_HISTORY_START_MILLIS) }
-                .getOrElse { SyncResult.NetworkError(it.message) }
-            val bpResult = runCatching { bpUseCase.execute(ALL_HISTORY_START_MILLIS) }
-                .getOrElse { SyncResult.NetworkError(it.message) }
+    private suspend fun runHistoryImport() {
+        val weightUseCase = SyncWeightUseCase(prefs, authService, apiService, hcManager)
+        val bpUseCase = SyncBloodPressureUseCase(prefs, authService, apiService, hcManager)
+        val importThroughMillis = System.currentTimeMillis()
+        val savedWeightCursor = prefs.getHistoryWeightTimestamp()
+        val savedBpCursor = prefs.getHistoryBpTimestamp()
+        val weightStart = if (savedWeightCursor == 0L) ALL_HISTORY_START_MILLIS else savedWeightCursor + 1L
+        val bpStart = if (savedBpCursor == 0L) ALL_HISTORY_START_MILLIS else savedBpCursor + 1L
 
-            val weightCount = (weightResult as? SyncResult.Success)?.uploadedCount ?: 0
-            val bpCount = (bpResult as? SyncResult.Success)?.bpUploaded ?: 0
-            val error = historyImportError(weightResult, bpResult)
-            val message = error ?: getApplication<Application>().getString(
-                R.string.history_import_complete,
-                weightCount + bpCount
-            )
+        val weightResult = runCatching { weightUseCase.execute(weightStart) }
+            .getOrElse { SyncResult.NetworkError(it.message) }
+        val bpResult = runCatching { bpUseCase.execute(bpStart) }
+            .getOrElse { SyncResult.NetworkError(it.message) }
 
-            prefs.setLastSyncTimestamp(System.currentTimeMillis())
-            prefs.setLastSyncCount(weightCount + bpCount)
-            val timestampText = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-                .format(Date(prefs.getLastSyncTimestamp()))
+        val weightCount = processedWeightCount(weightResult)
+        val bpCount = processedBpCount(bpResult)
+        saveHistoryProgress(weightResult, importThroughMillis, prefs::setHistoryWeightTimestamp)
+        saveHistoryProgress(bpResult, importThroughMillis, prefs::setHistoryBpTimestamp)
+        val error = historyImportError(weightResult, bpResult)
+        val message = error ?: getApplication<Application>().getString(
+            R.string.history_import_complete,
+            weightCount + bpCount
+        )
 
-            _state.value = _state.value.copy(
-                isImportingHistory = false,
-                syncError = message,
-                lastSyncText = timestampText,
-                lastSyncCount = weightCount + bpCount,
-                isGarminAuthenticated = prefs.getTokens()?.isAccessTokenExpired() == false
-            )
+        prefs.setLastSyncTimestamp(System.currentTimeMillis())
+        prefs.setLastSyncCount(weightCount + bpCount)
+        val timestampText = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+            .format(Date(prefs.getLastSyncTimestamp()))
+
+        _state.value = _state.value.copy(
+            isImportingHistory = false,
+            syncError = message,
+            lastSyncText = timestampText,
+            lastSyncCount = weightCount + bpCount,
+            isGarminAuthenticated = prefs.getTokens()?.isAccessTokenExpired() == false
+        )
+    }
+
+    private fun processedWeightCount(result: SyncResult): Int = when (result) {
+        is SyncResult.Success -> result.uploadedCount
+        is SyncResult.NetworkError -> result.processedCount
+        else -> 0
+    }
+
+    private fun processedBpCount(result: SyncResult): Int = when (result) {
+        is SyncResult.Success -> result.bpUploaded
+        is SyncResult.NetworkError -> result.processedCount
+        else -> 0
+    }
+
+    private fun saveHistoryProgress(
+        result: SyncResult,
+        completedThroughMillis: Long,
+        save: (Long) -> Unit
+    ) {
+        when (result) {
+            is SyncResult.Success -> save(completedThroughMillis)
+            is SyncResult.NetworkError -> {
+                if (result.lastProcessedTimestampMillis > 0L) {
+                    save(result.lastProcessedTimestampMillis)
+                }
+            }
+            else -> Unit
         }
     }
 
@@ -331,7 +379,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val failure = listOf(weightResult, bpResult).firstOrNull { it !is SyncResult.Success } ?: return null
         return when (failure) {
             is SyncResult.AuthError -> "Garmin auth error: ${failure.message}"
-            is SyncResult.NetworkError -> "History import failed: ${failure.message}"
+            is SyncResult.NetworkError -> getApplication<Application>().getString(
+                R.string.history_import_paused,
+                failure.message ?: "Unknown network error"
+            )
             is SyncResult.PermissionError -> getApplication<Application>().getString(R.string.history_permission_required)
             is SyncResult.NoCredentials -> getApplication<Application>().getString(R.string.history_import_not_ready)
             is SyncResult.Success -> null

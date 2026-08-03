@@ -61,6 +61,12 @@ class PreferencesManager(context: Context) {
     fun getLastBpMeasTimestamp(): Long = prefs.getLong(KEY_LAST_BP_MEAS_TS, 0L)
     fun setLastBpMeasTimestamp(ts: Long) { prefs.edit { putLong(KEY_LAST_BP_MEAS_TS, ts) } }
 
+    fun getHistoryWeightTimestamp(): Long = prefs.getLong(KEY_HISTORY_WEIGHT_TS, 0L)
+    fun setHistoryWeightTimestamp(ts: Long) { prefs.edit { putLong(KEY_HISTORY_WEIGHT_TS, ts) } }
+
+    fun getHistoryBpTimestamp(): Long = prefs.getLong(KEY_HISTORY_BP_TS, 0L)
+    fun setHistoryBpTimestamp(ts: Long) { prefs.edit { putLong(KEY_HISTORY_BP_TS, ts) } }
+
     fun getGarminVersion(): String = prefs.getString(KEY_GARMIN_VERSION, "4.75") ?: "4.75"
     fun setGarminVersion(v: String) { prefs.edit { putString(KEY_GARMIN_VERSION, v) } }
 
@@ -111,6 +117,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_LAST_SYNC_COUNT = "last_sync_count"
         private const val KEY_LAST_WEIGHT_MEAS_TS = "last_weight_meas_ts"
         private const val KEY_LAST_BP_MEAS_TS = "last_bp_meas_ts"
+        private const val KEY_HISTORY_WEIGHT_TS = "history_weight_ts"
+        private const val KEY_HISTORY_BP_TS = "history_bp_ts"
         private const val KEY_FIRST_RUN_DONE = "first_run_done"
         private const val KEY_RATE_LIMIT_UNTIL = "rate_limit_until"
         private const val KEY_LOGIN_ATTEMPTS = "login_attempts"

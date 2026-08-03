@@ -54,8 +54,9 @@ class SyncWeightUseCase(
 
         var uploadedCount = 0
         var lastUploadedMeasurement: WeightMeasurement? = null
-        var maxUploadedTs = lastWeightTs
-        for (record in records) {
+        var maxUploadedTs = sinceOverrideMillis?.minus(1L) ?: lastWeightTs
+        var uploadError: String? = null
+        for (record in records.sortedBy { it.epochSeconds }) {
             val fitBytes = FitFileBuilder.buildWeightFitFile(
                 record.weightKg,
                 record.bodyFatPercentage,
@@ -69,6 +70,9 @@ class SyncWeightUseCase(
                 // on next sync due to sub-second precision in Health Connect timestamps
                 val recordTs = record.epochSeconds * 1000L + 999L
                 if (recordTs > maxUploadedTs) maxUploadedTs = recordTs
+            } else {
+                uploadError = uploadResult.exceptionOrNull()?.message ?: "Unknown upload error"
+                break
             }
         }
 
@@ -76,6 +80,17 @@ class SyncWeightUseCase(
         prefs.setLastSyncCount(uploadedCount)
         if (maxUploadedTs > lastWeightTs) prefs.setLastWeightMeasTimestamp(maxUploadedTs)
 
-        return SyncResult.Success(uploadedCount = uploadedCount, lastMeasurement = lastUploadedMeasurement)
+        if (uploadError != null) {
+            return SyncResult.NetworkError(
+                message = uploadError,
+                processedCount = uploadedCount,
+                lastProcessedTimestampMillis = maxUploadedTs
+            )
+        }
+        return SyncResult.Success(
+            uploadedCount = uploadedCount,
+            lastMeasurement = lastUploadedMeasurement,
+            lastProcessedTimestampMillis = maxUploadedTs
+        )
     }
 }

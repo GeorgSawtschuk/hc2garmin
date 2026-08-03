@@ -28,6 +28,7 @@
     <string name="btn_import_all_history">Import All History</string>
     <string name="history_importing_text">Importing history...</string>
     <string name="history_import_complete">History import complete: %1$d measurement(s) processed.</string>
+    <string name="history_import_paused">History import paused: %1$s. Tap Import All History to continue.</string>
     <string name="history_permission_required">Health Connect history permission is required to import all history.</string>
     <string name="history_import_not_ready">Connect Health Connect and Garmin before importing history.</string>
     <string name="footer_text">Background sync runs automatically every hour.</string>

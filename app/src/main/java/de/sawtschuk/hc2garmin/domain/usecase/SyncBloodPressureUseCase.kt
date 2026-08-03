@@ -53,8 +53,8 @@ class SyncBloodPressureUseCase(
 
         var uploaded = 0
         var lastError: String? = null
-        var maxUploadedTs = lastBpTs
-        for (record in records) {
+        var maxUploadedTs = sinceOverrideMillis?.minus(1L) ?: lastBpTs
+        for (record in records.sortedBy { it.epochSeconds }) {
             val fitBytes = FitFileBuilder.buildBloodPressureFitFile(
                 record.systolicMmhg, record.diastolicMmhg, record.epochSeconds,
                 record.heartRateBpm ?: 72
@@ -67,15 +67,23 @@ class SyncBloodPressureUseCase(
             } else {
                 lastError = result.exceptionOrNull()?.message
                 android.util.Log.e("HC2Garmin", "BP upload failed: $lastError")
+                break
             }
         }
 
         if (maxUploadedTs > lastBpTs) prefs.setLastBpMeasTimestamp(maxUploadedTs)
         android.util.Log.d("HC2Garmin", "BP sync done: $uploaded/${records.size} uploaded")
 
-        if (uploaded == 0 && lastError != null) {
-            return SyncResult.NetworkError("BP upload failed: $lastError")
+        if (lastError != null) {
+            return SyncResult.NetworkError(
+                message = "BP upload failed: $lastError",
+                processedCount = uploaded,
+                lastProcessedTimestampMillis = maxUploadedTs
+            )
         }
-        return SyncResult.Success(bpUploaded = uploaded)
+        return SyncResult.Success(
+            bpUploaded = uploaded,
+            lastProcessedTimestampMillis = maxUploadedTs
+        )
     }
 }

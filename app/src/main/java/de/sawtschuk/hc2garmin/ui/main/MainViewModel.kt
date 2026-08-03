@@ -31,6 +31,8 @@ import java.util.Date
 data class MainUiState(
     val hasCredentials: Boolean = false,
     val hasHcPermission: Boolean = false,
+    val hasHistoryPermission: Boolean = false,
+    val isHistoryImportAvailable: Boolean = false,
     val hasNotificationPermission: Boolean = true,
     val isGarminAuthenticated: Boolean = false,
     val isIgnoringBatteryOptimizations: Boolean = true,
@@ -61,6 +63,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<MainUiState> = _state.asStateFlow()
 
     val requiredPermissions: Set<String> get() = hcManager.requiredPermissions
+    val historyPermissions: Set<String> get() = setOf(hcManager.historyPermission)
 
     fun loadState() {
         viewModelScope.launch {
@@ -69,6 +72,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             else DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(ts))
 
             val hasHcPerm = hcManager.hasPermissions()
+            val hasHistoryPerm = hcManager.hasHistoryPermission()
             val hasCredentials = prefs.getEmail() != null
             val isGarminAuth = prefs.getTokens()?.isAccessTokenExpired() == false
             
@@ -84,6 +88,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _state.value = _state.value.copy(
                 hasCredentials = hasCredentials,
                 hasHcPermission = hasHcPerm,
+                hasHistoryPermission = hasHistoryPerm,
+                isHistoryImportAvailable = hcManager.isHistoryReadAvailable(),
                 hasNotificationPermission = hasNotifPerm,
                 isGarminAuthenticated = isGarminAuth,
                 lastSyncText = tsText,
@@ -264,6 +270,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 isGarminAuthenticated = prefs.getTokens()?.isAccessTokenExpired() == false
             )
         }
+    }
+
+    fun onHistoryPermissionResult(granted: Boolean) {
+        _state.value = _state.value.copy(hasHistoryPermission = granted)
+        if (granted) {
+            triggerHistoryImport()
+        } else {
+            _state.value = _state.value.copy(
+                syncError = getApplication<Application>().getString(R.string.history_permission_required)
+            )
+        }
+    }
+
+    fun triggerHistoryImport() {
+        val current = _state.value
+        if (!current.hasHcPermission || !current.hasHistoryPermission || !current.isGarminAuthenticated) {
+            _state.value = current.copy(
+                syncError = getApplication<Application>().getString(R.string.history_import_not_ready)
+            )
+            return
+        }
+        _state.value = current.copy(
+            syncError = getApplication<Application>().getString(R.string.history_import_not_implemented)
+        )
     }
 
     fun dismissError() { _state.value = _state.value.copy(syncError = null) }

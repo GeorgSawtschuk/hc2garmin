@@ -46,6 +46,12 @@ fun MainScreen(
         PermissionController.createRequestPermissionResultContract()
     ) { _ -> vm.loadState() }
 
+    val historyPermissionLauncher = rememberLauncherForActivityResult(
+        PermissionController.createRequestPermissionResultContract()
+    ) { grantedPermissions ->
+        vm.onHistoryPermissionResult(grantedPermissions.containsAll(vm.historyPermissions))
+    }
+
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { _ -> vm.loadState() }
@@ -296,6 +302,21 @@ fun MainScreen(
                 } else {
                     Text(stringResource(R.string.btn_sync_now))
                 }
+            }
+
+            OutlinedButton(
+                onClick = {
+                    if (state.hasHistoryPermission) {
+                        vm.triggerHistoryImport()
+                    } else {
+                        historyPermissionLauncher.launch(vm.historyPermissions)
+                    }
+                },
+                enabled = !state.isSyncing && state.hasCredentials && state.hasHcPermission &&
+                    state.isGarminAuthenticated && state.isHistoryImportAvailable,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.btn_import_all_history))
             }
 
             Spacer(Modifier.weight(1f))

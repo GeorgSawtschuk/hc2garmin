@@ -2,7 +2,9 @@ package de.sawtschuk.hc2garmin.data.healthconnect
 
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.permission.HealthPermission.Companion.PERMISSION_READ_HEALTH_DATA_HISTORY
 import androidx.health.connect.client.records.BloodPressureRecord
 import androidx.health.connect.client.records.BodyFatRecord
 import androidx.health.connect.client.records.Record
@@ -34,6 +36,8 @@ class HealthConnectManager(private val context: Context) {
         "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
     )
 
+    val historyPermission: String = PERMISSION_READ_HEALTH_DATA_HISTORY
+
     fun isAvailable(): Boolean =
         HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
 
@@ -42,6 +46,16 @@ class HealthConnectManager(private val context: Context) {
         val granted = client.permissionController.getGrantedPermissions()
         granted.containsAll(requiredPermissions)
     }
+
+    suspend fun hasHistoryPermission(): Boolean = withContext(Dispatchers.IO) {
+        if (!isAvailable()) return@withContext false
+        historyPermission in client.permissionController.getGrantedPermissions()
+    }
+
+    fun isHistoryReadAvailable(): Boolean =
+        isAvailable() && client.features.getFeatureStatus(
+            HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_HISTORY
+        ) == HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
 
     suspend fun readWeightSince(sinceEpochMillis: Long): List<WeightMeasurement> =
         withContext(Dispatchers.IO) {

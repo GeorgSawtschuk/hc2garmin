@@ -25,6 +25,10 @@
     <string name="btn_connect_garmin">Connect to Garmin</string>
     <string name="btn_sync_now">Sync Now</string>
     <string name="syncing_text">Syncing...</string>
+    <string name="btn_import_all_history">Import All History</string>
+    <string name="history_permission_required">Health Connect history permission is required to import all history.</string>
+    <string name="history_import_not_ready">Connect Health Connect and Garmin before importing history.</string>
+    <string name="history_import_not_implemented">Historical import will be added in the next change.</string>
     <string name="footer_text">Background sync runs automatically every hour.</string>
 
     <plurals name="notification_weight_synced">

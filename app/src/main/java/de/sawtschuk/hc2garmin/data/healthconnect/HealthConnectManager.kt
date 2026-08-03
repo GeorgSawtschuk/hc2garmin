@@ -2,9 +2,12 @@ package de.sawtschuk.hc2garmin.data.healthconnect
 
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.permission.HealthPermission.Companion.PERMISSION_READ_HEALTH_DATA_HISTORY
 import androidx.health.connect.client.records.BloodPressureRecord
 import androidx.health.connect.client.records.BodyFatRecord
+import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
@@ -17,6 +20,7 @@ import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.reflect.KClass
 
 class HealthConnectManager(private val context: Context) {
 
@@ -32,6 +36,8 @@ class HealthConnectManager(private val context: Context) {
         "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
     )
 
+    val historyPermission: String = PERMISSION_READ_HEALTH_DATA_HISTORY
+
     fun isAvailable(): Boolean =
         HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
 
@@ -41,24 +47,23 @@ class HealthConnectManager(private val context: Context) {
         granted.containsAll(requiredPermissions)
     }
 
+    suspend fun hasHistoryPermission(): Boolean = withContext(Dispatchers.IO) {
+        if (!isAvailable()) return@withContext false
+        historyPermission in client.permissionController.getGrantedPermissions()
+    }
+
+    fun isHistoryReadAvailable(): Boolean =
+        isAvailable() && client.features.getFeatureStatus(
+            HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_HISTORY
+        ) == HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
+
     suspend fun readWeightSince(sinceEpochMillis: Long): List<WeightMeasurement> =
         withContext(Dispatchers.IO) {
             val start = Instant.ofEpochMilli(sinceEpochMillis)
             val end = Instant.now()
 
-            val weightRecords = client.readRecords(
-                ReadRecordsRequest(
-                    recordType = WeightRecord::class,
-                    timeRangeFilter = TimeRangeFilter.between(start, end)
-                )
-            ).records
-
-            val fatRecords = client.readRecords(
-                ReadRecordsRequest(
-                    recordType = BodyFatRecord::class,
-                    timeRangeFilter = TimeRangeFilter.between(start, end)
-                )
-            ).records
+            val weightRecords = readAllRecords(WeightRecord::class, start, end)
+            val fatRecords = readAllRecords(BodyFatRecord::class, start, end)
 
             weightRecords.map { weightRecord ->
                 val date = weightRecord.time.atZone(ZoneId.systemDefault()).toLocalDate().toString()
@@ -83,20 +88,10 @@ class HealthConnectManager(private val context: Context) {
             val start = Instant.ofEpochMilli(sinceEpochMillis)
             val end = Instant.now()
 
-            val records = client.readRecords(
-                ReadRecordsRequest(
-                    recordType = BloodPressureRecord::class,
-                    timeRangeFilter = TimeRangeFilter.between(start, end)
-                )
-            ).records
+            val records = readAllRecords(BloodPressureRecord::class, start, end)
 
             val restingHrRecords = runCatching {
-                client.readRecords(
-                    ReadRecordsRequest(
-                        recordType = RestingHeartRateRecord::class,
-                        timeRangeFilter = TimeRangeFilter.between(start, end)
-                    )
-                ).records
+                readAllRecords(RestingHeartRateRecord::class, start, end)
             }.getOrElse { emptyList() }
 
             records.map { r ->
@@ -114,4 +109,31 @@ class HealthConnectManager(private val context: Context) {
                 )
             }
         }
+
+    private suspend fun <T : Record> readAllRecords(
+        recordType: KClass<T>,
+        start: Instant,
+        end: Instant
+    ): List<T> {
+        val records = mutableListOf<T>()
+        var pageToken: String? = null
+        do {
+            val response = client.readRecords(
+                ReadRecordsRequest(
+                    recordType = recordType,
+                    timeRangeFilter = TimeRangeFilter.between(start, end),
+                    ascendingOrder = true,
+                    pageSize = PAGE_SIZE,
+                    pageToken = pageToken
+                )
+            )
+            records += response.records
+            pageToken = response.pageToken
+        } while (pageToken != null)
+        return records
+    }
+
+    companion object {
+        private const val PAGE_SIZE = 1000
+    }
 }

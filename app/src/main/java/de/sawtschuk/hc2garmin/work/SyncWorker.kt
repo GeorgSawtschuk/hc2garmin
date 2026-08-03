@@ -20,7 +20,11 @@ import java.util.concurrent.TimeUnit
 class SyncWorker(appContext: Context, params: WorkerParameters) :
     CoroutineWorker(appContext, params) {
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result = SyncCoordinator.runExclusive {
+        runSync()
+    }
+
+    private suspend fun runSync(): Result {
         val prefs = PreferencesManager(applicationContext)
         val authService = GarminAuthService(prefs)
         val apiService = GarminApiService(authService)

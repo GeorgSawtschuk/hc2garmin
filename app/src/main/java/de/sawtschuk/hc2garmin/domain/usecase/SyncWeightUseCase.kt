@@ -16,7 +16,7 @@ class SyncWeightUseCase(
     private val apiService: GarminApiService,
     private val hcManager: HealthConnectManager
 ) {
-    suspend fun execute(): SyncResult {
+    suspend fun execute(sinceOverrideMillis: Long? = null): SyncResult {
         if (!hcManager.isAvailable()) return SyncResult.PermissionError
         if (!hcManager.hasPermissions()) return SyncResult.PermissionError
         if (prefs.getEmail() == null) return SyncResult.NoCredentials
@@ -34,7 +34,7 @@ class SyncWeightUseCase(
 
         // Read only measurements newer than the last successfully uploaded one
         val lastWeightTs = prefs.getLastWeightMeasTimestamp()
-        val sinceMillis = if (lastWeightTs == 0L) {
+        val sinceMillis = sinceOverrideMillis ?: if (lastWeightTs == 0L) {
             // First sync: start from today midnight (local time)
             LocalDate.now(ZoneId.systemDefault())
                 .atStartOfDay(ZoneId.systemDefault())

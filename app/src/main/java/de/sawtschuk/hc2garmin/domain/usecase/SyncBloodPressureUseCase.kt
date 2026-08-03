@@ -17,7 +17,7 @@ class SyncBloodPressureUseCase(
     private val apiService: GarminApiService,
     private val hcManager: HealthConnectManager
 ) {
-    suspend fun execute(): SyncResult {
+    suspend fun execute(sinceOverrideMillis: Long? = null): SyncResult {
         if (!hcManager.isAvailable()) return SyncResult.PermissionError
         if (!hcManager.hasPermissions()) return SyncResult.PermissionError
         if (prefs.getEmail() == null) return SyncResult.NoCredentials
@@ -34,7 +34,7 @@ class SyncBloodPressureUseCase(
         }
 
         val lastBpTs = prefs.getLastBpMeasTimestamp()
-        val sinceMillis = if (lastBpTs == 0L) {
+        val sinceMillis = sinceOverrideMillis ?: if (lastBpTs == 0L) {
             // First sync: start from today midnight (local time)
             LocalDate.now(ZoneId.systemDefault())
                 .atStartOfDay(ZoneId.systemDefault())

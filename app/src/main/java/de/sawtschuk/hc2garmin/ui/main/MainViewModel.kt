@@ -39,6 +39,7 @@ data class MainUiState(
     val lastSyncText: String = "Never",
     val lastSyncCount: Int = 0,
     val isSyncing: Boolean = false,
+    val isImportingHistory: Boolean = false,
     val syncError: String? = null,
     // Connect dialog
     val showConnectDialog: Boolean = false,
@@ -285,15 +286,56 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun triggerHistoryImport() {
         val current = _state.value
+        if (current.isSyncing || current.isImportingHistory) return
         if (!current.hasHcPermission || !current.hasHistoryPermission || !current.isGarminAuthenticated) {
             _state.value = current.copy(
                 syncError = getApplication<Application>().getString(R.string.history_import_not_ready)
             )
             return
         }
-        _state.value = current.copy(
-            syncError = getApplication<Application>().getString(R.string.history_import_not_implemented)
-        )
+
+        _state.value = current.copy(isImportingHistory = true, syncError = null)
+        viewModelScope.launch {
+            val weightUseCase = SyncWeightUseCase(prefs, authService, apiService, hcManager)
+            val bpUseCase = SyncBloodPressureUseCase(prefs, authService, apiService, hcManager)
+
+            val weightResult = runCatching { weightUseCase.execute(ALL_HISTORY_START_MILLIS) }
+                .getOrElse { SyncResult.NetworkError(it.message) }
+            val bpResult = runCatching { bpUseCase.execute(ALL_HISTORY_START_MILLIS) }
+                .getOrElse { SyncResult.NetworkError(it.message) }
+
+            val weightCount = (weightResult as? SyncResult.Success)?.uploadedCount ?: 0
+            val bpCount = (bpResult as? SyncResult.Success)?.bpUploaded ?: 0
+            val error = historyImportError(weightResult, bpResult)
+            val message = error ?: getApplication<Application>().getString(
+                R.string.history_import_complete,
+                weightCount + bpCount
+            )
+
+            prefs.setLastSyncTimestamp(System.currentTimeMillis())
+            prefs.setLastSyncCount(weightCount + bpCount)
+            val timestampText = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+                .format(Date(prefs.getLastSyncTimestamp()))
+
+            _state.value = _state.value.copy(
+                isImportingHistory = false,
+                syncError = message,
+                lastSyncText = timestampText,
+                lastSyncCount = weightCount + bpCount,
+                isGarminAuthenticated = prefs.getTokens()?.isAccessTokenExpired() == false
+            )
+        }
+    }
+
+    private fun historyImportError(weightResult: SyncResult, bpResult: SyncResult): String? {
+        val failure = listOf(weightResult, bpResult).firstOrNull { it !is SyncResult.Success } ?: return null
+        return when (failure) {
+            is SyncResult.AuthError -> "Garmin auth error: ${failure.message}"
+            is SyncResult.NetworkError -> "History import failed: ${failure.message}"
+            is SyncResult.PermissionError -> getApplication<Application>().getString(R.string.history_permission_required)
+            is SyncResult.NoCredentials -> getApplication<Application>().getString(R.string.history_import_not_ready)
+            is SyncResult.Success -> null
+        }
     }
 
     fun dismissError() { _state.value = _state.value.copy(syncError = null) }
@@ -303,5 +345,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             "Invalid email or password. Please check your Garmin Connect credentials."
         msg.contains("429") -> "Too many attempts. Please wait a minute and try again."
         else -> "Connection failed: $msg"
+    }
+
+    companion object {
+        // FIT timestamps begin at 1989-12-31T00:00:00Z. Health data older than this
+        // cannot be represented by the FIT files Garmin accepts.
+        private const val ALL_HISTORY_START_MILLIS = 631_065_600_000L
     }
 }

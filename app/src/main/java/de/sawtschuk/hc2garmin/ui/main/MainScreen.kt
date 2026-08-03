@@ -288,7 +288,7 @@ fun MainScreen(
             // Sync now button
             Button(
                 onClick = vm::triggerManualSync,
-                enabled = !state.isSyncing && state.hasCredentials && state.hasHcPermission && state.isGarminAuthenticated,
+                enabled = !state.isSyncing && !state.isImportingHistory && state.hasCredentials && state.hasHcPermission && state.isGarminAuthenticated,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (state.isSyncing) {
@@ -312,11 +312,17 @@ fun MainScreen(
                         historyPermissionLauncher.launch(vm.historyPermissions)
                     }
                 },
-                enabled = !state.isSyncing && state.hasCredentials && state.hasHcPermission &&
+                enabled = !state.isSyncing && !state.isImportingHistory && state.hasCredentials && state.hasHcPermission &&
                     state.isGarminAuthenticated && state.isHistoryImportAvailable,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(stringResource(R.string.btn_import_all_history))
+                if (state.isImportingHistory) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.history_importing_text))
+                } else {
+                    Text(stringResource(R.string.btn_import_all_history))
+                }
             }
 
             Spacer(Modifier.weight(1f))

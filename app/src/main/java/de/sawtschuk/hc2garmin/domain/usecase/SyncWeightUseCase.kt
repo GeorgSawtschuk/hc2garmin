@@ -16,7 +16,7 @@ class SyncWeightUseCase(
     private val apiService: GarminApiService,
     private val hcManager: HealthConnectManager
 ) {
-    suspend fun execute(): SyncResult {
+    suspend fun execute(sinceOverrideMillis: Long? = null): SyncResult {
         if (!hcManager.isAvailable()) return SyncResult.PermissionError
         if (!hcManager.hasPermissions()) return SyncResult.PermissionError
         if (prefs.getEmail() == null) return SyncResult.NoCredentials
@@ -34,7 +34,7 @@ class SyncWeightUseCase(
 
         // Read only measurements newer than the last successfully uploaded one
         val lastWeightTs = prefs.getLastWeightMeasTimestamp()
-        val sinceMillis = if (lastWeightTs == 0L) {
+        val sinceMillis = sinceOverrideMillis ?: if (lastWeightTs == 0L) {
             // First sync: start from today midnight (local time)
             LocalDate.now(ZoneId.systemDefault())
                 .atStartOfDay(ZoneId.systemDefault())
@@ -54,8 +54,9 @@ class SyncWeightUseCase(
 
         var uploadedCount = 0
         var lastUploadedMeasurement: WeightMeasurement? = null
-        var maxUploadedTs = lastWeightTs
-        for (record in records) {
+        var maxUploadedTs = sinceOverrideMillis?.minus(1L) ?: lastWeightTs
+        var uploadError: String? = null
+        for (record in records.sortedBy { it.epochSeconds }) {
             val fitBytes = FitFileBuilder.buildWeightFitFile(
                 record.weightKg,
                 record.bodyFatPercentage,
@@ -69,6 +70,9 @@ class SyncWeightUseCase(
                 // on next sync due to sub-second precision in Health Connect timestamps
                 val recordTs = record.epochSeconds * 1000L + 999L
                 if (recordTs > maxUploadedTs) maxUploadedTs = recordTs
+            } else {
+                uploadError = uploadResult.exceptionOrNull()?.message ?: "Unknown upload error"
+                break
             }
         }
 
@@ -76,6 +80,17 @@ class SyncWeightUseCase(
         prefs.setLastSyncCount(uploadedCount)
         if (maxUploadedTs > lastWeightTs) prefs.setLastWeightMeasTimestamp(maxUploadedTs)
 
-        return SyncResult.Success(uploadedCount = uploadedCount, lastMeasurement = lastUploadedMeasurement)
+        if (uploadError != null) {
+            return SyncResult.NetworkError(
+                message = uploadError,
+                processedCount = uploadedCount,
+                lastProcessedTimestampMillis = maxUploadedTs
+            )
+        }
+        return SyncResult.Success(
+            uploadedCount = uploadedCount,
+            lastMeasurement = lastUploadedMeasurement,
+            lastProcessedTimestampMillis = maxUploadedTs
+        )
     }
 }
